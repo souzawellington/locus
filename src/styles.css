@@ -150,6 +150,26 @@
   width: 100%;
 }
 
+.locus-sticker-wrap {
+  display: inline-block;
+  max-width: 240px;
+}
+
+.locus-sticker {
+  padding: 10px 10px 12px;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 1px rgba(26, 23, 20, 0.06),
+    0 12px 22px -14px rgba(26, 23, 20, 0.55);
+}
+
+.locus-sticker .iso-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

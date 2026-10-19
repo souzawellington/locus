@@ -1,6 +1,7 @@
 import { Command } from "cmdk";
 import { downloadText, slugify } from "@/lib/vault/format";
 import { FIGURES } from "@/figures/geometry/machines";
+import { formatFigureEmbed } from "@/lib/vault/markdown";
 import { PATTERNS } from "@/lib/vault/patterns";
 import { useVault } from "@/lib/vault/store";
 import type { WorkspaceView, WriteMode } from "@/lib/vault/types";
@@ -103,6 +104,20 @@ export function CommandPalette({ shortcut }: { shortcut: string }) {
               <span className="font-mono text-xs text-copper">{figure.fig}</span>
               <span className="mt-1 block text-ink">{figure.title}</span>
               <span className="block text-xs text-muted">{figure.blurb}</span>
+            </Command.Item>
+          ))}
+        </Command.Group>
+        <Command.Group heading="Figurinhas">
+          {FIGURES.map((figure, index) => (
+            <Command.Item
+              key={`sticker-${figure.slug}`}
+              value={`figurinha ${figure.slug} ${figure.title} ${formatFigureEmbed({ slug: figure.slug, size: "sticker", motion: "animated" })}`}
+              className="rounded-md px-3 py-3 text-sm"
+              onSelect={() => insertFigure(figure.slug, { size: "sticker", motion: "animated", tilt: ((index % 5) - 2) })}
+            >
+              <span className="font-mono text-xs text-copper">adesivo</span>
+              <span className="mt-1 block text-ink">{figure.title}</span>
+              <span className="block text-xs text-muted">Animada, na nota aberta</span>
             </Command.Item>
           ))}
         </Command.Group>

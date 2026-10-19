@@ -53,6 +53,20 @@ The drawings are [Anatomy](https://github.com/wheresryan22/anatomy) figures (MIT
 
 ![A figure inside a note](docs/assets/figures.png)
 
+### Stickers
+
+**Figurinhas**, in the header, is a drawer of the same machines. Each one has a white edge, a soft shadow, and a small tilt. **Na nota** drops it into the open note. **No canvas** puts it on the board as its own piece: the canvas still draws note cards, and a sticker sits beside them so you can drag it. It is not a second copy of a note.
+
+`![[figure:crdt|sticker|animated]]` loops that machine. `![[figure:crdt|sticker]]` holds still. The flags can come in any order. `tilt:-3` turns it, from -12 to 12 degrees. Older lines still work: `![[figure:wikilinks]]` is the full instrument, and `|sticker` alone is a still sticker.
+
+Export stays on this device. From the note or the drawer: SVG, a transparent PNG at 512 and at 1024, and an animated SVG. The animation is the same `place` loop, written as SVG motion, so it needs no GIF or WebP encoder and stays sharp. `prefers-reduced-motion` freezes the live loop.
+
+![The Figurinhas drawer](docs/assets/stickers-drawer.png)
+
+![An animated composing-stick sticker](docs/assets/stickers.gif)
+
+![A sticker dropped on the canvas](docs/assets/stickers-canvas.png)
+
 ## Interface
 
 Captured from the running app. The window frame is only for this page.

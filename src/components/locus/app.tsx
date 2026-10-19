@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { AtlasView } from "./atlas-view";
 import { CanvasBoard } from "./canvas-board";
 import { CommandPalette } from "./command-palette";
+import { StickerDrawer } from "./sticker-drawer";
 import { Editor } from "./editor";
 import { GraphView } from "./graph-view";
 import { Sidebar } from "./sidebar";
@@ -42,6 +43,7 @@ export function LocusApp() {
   const resetVault = useVault((state) => state.resetVault);
   const shortcut = shortcutLabel();
   const [hold, setHold] = useState(true);
+  const [stickersOpen, setStickersOpen] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -182,6 +184,9 @@ export function LocusApp() {
         <button type="button" onClick={() => setFocus(!focusMode)} className="h-10 rounded-md px-3 text-sm text-muted">
           {focusMode ? "Sair do foco" : "Foco"}
         </button>
+        <button type="button" aria-expanded={stickersOpen} onClick={() => setStickersOpen(true)} className="h-10 rounded-md px-3 text-sm text-muted">
+          Figurinhas
+        </button>
         <button type="button" aria-label="Comandos" onClick={() => setPalette(true)} className="hidden h-10 rounded-md px-3 text-sm text-muted sm:inline">
           {shortcut}+K
         </button>
@@ -230,6 +235,7 @@ export function LocusApp() {
       )}
 
       <CommandPalette shortcut={shortcut} />
+      <StickerDrawer open={stickersOpen} onClose={() => setStickersOpen(false)} />
 
       {confirm ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-labelledby="confirm-title">

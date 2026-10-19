@@ -18,6 +18,8 @@ export function seedNotes(): Note[] {
       canvas: { x: 1040, y: 520, w: 280, h: 160 },
       body: `Cada figura é uma máquina pequena. O mecanismo é o conceito: o cabo é a ligação, o componedor é a fusão, a prensa espera o sim. Passe o cursor ou use as setas. A desmonta, quando a peça se separa.
 
+![[figure:crdt|sticker|animated|tilt:-2]]
+
 ![[figure:wikilinks]]
 
 ![[figure:crdt]]

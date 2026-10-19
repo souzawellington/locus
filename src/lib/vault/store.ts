@@ -1,10 +1,10 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { messageId, planTurn, runReadOnly } from "./agent";
-import { rewriteWikilinks } from "./markdown";
+import { formatFigureEmbed, rewriteWikilinks, type FigureMotion, type FigureSize } from "./markdown";
 import { findNote, findNoteLoose } from "./retrieve";
 import { seedCells, seedNotes } from "./seed";
-import type { CanvasPos, ChatMessage, ConfirmState, Note, NoteDraft, NotebookCell, WorkspaceView, WriteMode } from "./types";
+import type { BoardSticker, CanvasPos, ChatMessage, ConfirmState, Note, NoteDraft, NotebookCell, WorkspaceView, WriteMode } from "./types";
 
 type Theme = "light" | "dark";
 
@@ -12,6 +12,7 @@ type FabricJob = { assistantId: string; patternId: string; source: string; start
 
 type VaultState = {
   notes: Note[];
+  stickers: BoardSticker[];
   cells: NotebookCell[];
   messages: ChatMessage[];
   activeId: string;
@@ -39,7 +40,10 @@ type VaultState = {
   select: (id: string) => void;
   createNote: (partial?: { title?: string; body?: string }) => void;
   updateBody: (id: string, body: string) => void;
-  insertFigure: (slug: string) => void;
+  insertFigure: (slug: string, options?: { size?: FigureSize; motion?: FigureMotion; tilt?: number }) => void;
+  placeSticker: (sticker: { slug: string; animated?: boolean; tilt?: number }) => void;
+  moveSticker: (id: string, x: number, y: number) => void;
+  removeSticker: (id: string) => void;
   updateTitle: (id: string, title: string) => void;
   commitRename: (id: string, from: string, to: string) => void;
   deleteNote: (id: string) => void;
@@ -122,6 +126,7 @@ export const useVault = create<VaultState>()(
   persist(
     (set, get) => ({
       notes: initialNotes,
+      stickers: [],
       cells: seedCells(),
       messages: [],
       activeId: "n-routine",
@@ -174,8 +179,8 @@ export const useVault = create<VaultState>()(
         set({
           notes: get().notes.map((note) => (note.id === id ? { ...note, body, updatedAt: Date.now() } : note)),
         }),
-      insertFigure: (slug) => {
-        const line = `![[figure:${slug}]]`;
+      insertFigure: (slug, options) => {
+        const line = formatFigureEmbed({ slug, ...options });
         const state = get();
         const note = state.notes.find((item) => item.id === state.activeId);
         if (!note) {
@@ -191,6 +196,26 @@ export const useVault = create<VaultState>()(
           paletteOpen: false,
         });
       },
+      placeSticker: ({ slug, animated = true, tilt }) => {
+        const list = get().stickers ?? [];
+        const placedNotes = get().notes.filter((note) => note.canvas);
+        const right = placedNotes.reduce((max, note) => Math.max(max, (note.canvas?.x ?? 0) + (note.canvas?.w ?? 0)), 48);
+        const top = placedNotes.reduce((min, note) => Math.min(min, note.canvas?.y ?? 80), 80);
+        const placed: BoardSticker = {
+          id: crypto.randomUUID(),
+          slug,
+          x: right + 28,
+          y: top + list.length * 36,
+          tilt: tilt ?? ((list.length % 5) - 2) * 1.5,
+          animated,
+        };
+        set({ stickers: [...list, placed], view: "canvas" });
+      },
+      moveSticker: (id, x, y) =>
+        set({
+          stickers: (get().stickers ?? []).map((sticker) => (sticker.id === id ? { ...sticker, x, y } : sticker)),
+        }),
+      removeSticker: (id) => set({ stickers: (get().stickers ?? []).filter((sticker) => sticker.id !== id) }),
       updateTitle: (id, title) =>
         set({
           notes: get().notes.map((note) => (note.id === id ? { ...note, title } : note)),
@@ -404,6 +429,7 @@ export const useVault = create<VaultState>()(
         const notes = seedNotes();
         set({
           notes,
+          stickers: [],
           cells: seedCells(),
           messages: [],
           activeId: "n-routine",
@@ -422,6 +448,7 @@ export const useVault = create<VaultState>()(
       skipHydration: true,
       partialize: (state) => ({
         notes: state.notes,
+        stickers: state.stickers,
         cells: state.cells,
         messages: state.messages,
         activeId: state.activeId,
