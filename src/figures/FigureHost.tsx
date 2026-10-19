@@ -4,18 +4,23 @@ import { follow, useInView, useLoop, useReadout } from "../../.agents/skills/ana
 import { translateAlong } from "../../.agents/skills/anatomy/kit/iso-kit";
 import "../../.agents/skills/anatomy/kit/iso.css";
 import type { FigureEmbed } from "@/lib/vault/markdown";
+import { useVault } from "@/lib/vault/store";
+import { resolveMachine } from "./idea/compile";
+import type { SavedIdea } from "./idea/schema";
 import { sorted } from "./geometry/common";
-import { machineBySlug, type Machine } from "./geometry/machines";
+import type { Machine } from "./geometry/machines";
 import { exportFigure, type ExportKind } from "./export-client";
 
 function MachineView({
   machine,
   loop,
   interactive,
+  forcedApart = false,
 }: {
   machine: Machine;
   loop: boolean;
   interactive: boolean;
+  forcedApart?: boolean;
 }) {
   const stage = useRef<HTMLDivElement>(null);
   const inView = useInView(stage);
@@ -48,6 +53,8 @@ function MachineView({
     }
     const now = performance.now();
     const handsOn = interactive && now - touched.current < 1800;
+    if (forcedApart) goal.current.apart = 1;
+    else if (!handsOn) goal.current.apart = 0;
     if (loop && !handsOn) goal.current.t = 0.5 + Math.sin(now / 900) * 0.34;
     const next = shown.current;
     next.t = follow(next.t, goal.current.t, dt, 0.18, false);
@@ -149,8 +156,20 @@ const EXPORTS: { kind: ExportKind; label: string }[] = [
   { kind: "svg-animated", label: "SVG animado" },
 ];
 
-export function FigureHost({ embed, showExport = true }: { embed: FigureEmbed; showExport?: boolean }) {
-  const machine = machineBySlug(embed.slug);
+export function FigureHost({
+  embed,
+  showExport = true,
+  apart = false,
+  draft = null,
+}: {
+  embed: FigureEmbed;
+  showExport?: boolean;
+  apart?: boolean;
+  draft?: SavedIdea | null;
+}) {
+  const ideas = useVault((state) => state.ideas);
+  const pool = draft ? [draft, ...(ideas ?? []).filter((item) => item.slug !== draft.slug)] : (ideas ?? []);
+  const machine = resolveMachine(embed.slug, pool);
   const root = useRef<HTMLDivElement>(null);
   if (!machine) {
     return (
@@ -171,7 +190,7 @@ export function FigureHost({ embed, showExport = true }: { embed: FigureEmbed; s
         data-motion={embed.motion}
         style={embed.tilt ? { transform: `rotate(${embed.tilt}deg)` } : undefined}
       >
-        <MachineView machine={machine} loop={loop} interactive={!sticker} />
+        <MachineView machine={machine} loop={loop} interactive={!sticker} forcedApart={apart} />
       </div>
       {showExport ? (
         <div className="mt-2 flex flex-wrap gap-1" aria-label={`Exportar ${machine.title}`}>
