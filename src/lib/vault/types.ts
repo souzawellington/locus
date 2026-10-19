@@ -64,6 +64,6 @@ export type ChatMessage = {
 };
 
 export type WriteMode = "visual" | "source" | "blocks" | "read";
-export type WorkspaceView = "notes" | "canvas" | "notebook" | "graph" | "atlas";
+export type WorkspaceView = "notes" | "canvas" | "notebook" | "graph" | "atlas" | "map";
 
 export type ConfirmState = { kind: "delete"; id: string } | { kind: "reset" } | null;

@@ -12,6 +12,7 @@ const views: { id: WorkspaceView; label: string }[] = [
   { id: "notebook", label: "Ir para Caderno" },
   { id: "graph", label: "Ir para Grafo" },
   { id: "atlas", label: "Ir para Atlas" },
+  { id: "map", label: "Ir para Mapa" },
 ];
 
 export function CommandPalette({ shortcut }: { shortcut: string }) {

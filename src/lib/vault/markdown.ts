@@ -1,4 +1,4 @@
-export type BlockKind = "heading" | "paragraph" | "list" | "quote" | "code" | "rule" | "figure" | "media" | "place";
+export type BlockKind = "heading" | "paragraph" | "list" | "quote" | "code" | "rule" | "figure" | "media" | "place" | "flight";
 
 export type MdBlock = {
   id: string;
@@ -24,7 +24,14 @@ const KIND_LABEL: Record<BlockKind, string> = {
   figure: "figura",
   media: "mídia",
   place: "mapa",
+  flight: "voo",
 };
+
+const FLIGHT_LINE = /^!\[\[flight:([A-Z]{2,3}\d{2,4})\]\]$/;
+
+export function flightCallsign(raw: string): string | null {
+  return FLIGHT_LINE.exec(raw.trim())?.[1] ?? null;
+}
 
 const PLACE_LINE = /^!\[\[place:-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)\|(?:car|bike|walk)\|[^|\]]*\|[^\]]*\]\]$/;
 
@@ -113,6 +120,7 @@ function kindOf(raw: string): BlockKind {
   if (parseFigureEmbed(trimmed)) return "figure";
   if (parseMediaEmbed(trimmed)) return "media";
   if (isPlaceLine(trimmed)) return "place";
+  if (flightCallsign(trimmed)) return "flight";
   if (trimmed.startsWith("```")) return "code";
   if (/^(-{3,}|\*{3,})$/.test(trimmed)) return "rule";
   if (/^#{1,3}\s/.test(trimmed)) return "heading";
@@ -153,7 +161,7 @@ export function parseBlocks(markdown: string): MdBlock[] {
       flush();
       continue;
     }
-    if (parseFigureEmbed(line) || parseMediaEmbed(line) || isPlaceLine(line)) {
+    if (parseFigureEmbed(line) || parseMediaEmbed(line) || isPlaceLine(line) || flightCallsign(line)) {
       flush();
       chunks.push(line);
       continue;
@@ -329,6 +337,7 @@ export function plainText(markdown: string): string {
     .replace(/!\[\[figure:[a-z0-9-]+(?:\|[a-z0-9:-]+)*\]\]/g, " ")
     .replace(/!\[\[media:[a-z0-9-]+(?:\|[^\]]*)?\]\]/g, " ")
     .replace(/!\[\[place:-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)\|(?:car|bike|walk)\|[^|\]]*\|[^\]]*\]\]/g, " ")
+    .replace(/!\[\[flight:[A-Z]{2,3}\d{2,4}\]\]/g, " ")
     .replace(/\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|([^\]]+))?\]\]/g, (_, title: string, label?: string) => label?.trim() || title.trim())
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1")
     .replace(/[*_`>#-]/g, " ")

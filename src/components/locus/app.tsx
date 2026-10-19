@@ -1,4 +1,4 @@
-import { FileText, Frame, Library, Moon, PanelLeft, Settings, Sigma, Sun, Waypoints, X } from "lucide-react";
+import { FileText, Frame, Library, Map as MapIcon, Moon, PanelLeft, Settings, Sigma, Sun, Waypoints, X } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { idleExpired, lastActiveAt, markActive } from "@/lib/vault/seal";
 import { useVault } from "@/lib/vault/store";
@@ -12,6 +12,7 @@ import { StickerDrawer } from "./sticker-drawer";
 import { Editor } from "./editor";
 import { GraphView } from "./graph-view";
 import { SettingsSheet } from "./settings-sheet";
+import { WorldMap } from "./world-map";
 import { Sidebar } from "./sidebar";
 
 const NotebookView = lazy(() => import("./notebook-view").then((mod) => ({ default: mod.NotebookView })));
@@ -22,6 +23,7 @@ const views: { id: WorkspaceView; label: string; icon: typeof FileText }[] = [
   { id: "notebook", label: "Caderno", icon: Sigma },
   { id: "graph", label: "Grafo", icon: Waypoints },
   { id: "atlas", label: "Atlas", icon: Library },
+  { id: "map", label: "Mapa", icon: MapIcon },
 ];
 
 function shortcutLabel() {
@@ -126,7 +128,7 @@ export function LocusApp() {
         state.setSidebar(!state.sidebarOpen);
         return;
       }
-      if (meta && ["1", "2", "3", "4", "5"].includes(event.key)) {
+      if (meta && ["1", "2", "3", "4", "5", "6"].includes(event.key)) {
         event.preventDefault();
         const next = views[Number(event.key) - 1];
         if (next) state.setView(next.id);
@@ -242,6 +244,7 @@ export function LocusApp() {
           ) : null}
           {view === "graph" ? <GraphView /> : null}
           {view === "atlas" ? <AtlasView /> : null}
+          {view === "map" ? <WorldMap /> : null}
         </main>
       </div>
 

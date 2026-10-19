@@ -10,6 +10,7 @@ import {
   parseFigureEmbed,
   parseInline,
   parseMediaEmbed,
+  flightCallsign,
   isPlaceLine,
   quoteText,
   type InlineNode,
@@ -18,6 +19,7 @@ import {
 import { sessionKey } from "@/lib/vault/seal";
 import { placesIn } from "@/lib/maps/place";
 import { PlaceStack } from "./place-view";
+import { FlightCard } from "./flight-card";
 
 function Inline({ nodes, onWiki }: { nodes: InlineNode[]; onWiki: (title: string) => void }) {
   return (
@@ -98,6 +100,8 @@ function BlockView({ block, onWiki, noteId, markdown, index }: { block: MdBlock;
       </figure>
     );
   }
+  const flight = flightCallsign(block.raw);
+  if (flight) return <FlightCard callsign={flight} showMap={placesIn(markdown).length === 0} onAir={() => undefined} />;
   if (block.kind === "place" || isPlaceLine(block.raw)) {
     const first = placesIn(markdown)[0]?.index;
     if (first !== index) return null;

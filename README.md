@@ -33,6 +33,20 @@ Locus é um cofre de notas que mora no navegador. Você escreve como num bloco d
 - **Atlas.** Local retrieval over the vault (n-gram vectors and BM25) with citations. Pattern tools such as `extract_wisdom` preview a note and write only after you approve. Locked notes stay out of search until they are open.
 - **On this device.** Search, theme, focus mode, and the command palette (`Ctrl+K` or `⌘K`). New note is `Ctrl+N`. **Ajustes** holds **Ver código** for the file view, off by default, and an optional device PIN.
 - **Figures.** A note can hold an interactive instrument. Insert it from `/` or **+**, as a full figure or a sticker.
+The flight card, place alerts, and the full-screen map question follow the approach of [Osiris](https://github.com/simplifaisoul/osiris) (MIT, simplifaisoul): the same public feeds, fetched only when you open the card. Locus does not copy that project's code. Osiris watches OpenSky, ADS-B feeds, USGS, NASA EONET, NASA FIRMS, and Open-Meteo, and it lets you draw an area on a MapLibre map. Here that becomes a note, not a global dashboard.
+
+- **Flights.** A number such as LA8084 offers **Acompanhar voo**, and **Voo** is in the `/` menu. The card names the airline, the airports, and the status. A live position, heading, and altitude appear on the note's map while the card is on screen, and the refresh pauses when it is hidden. If the plane is on the ground or out of coverage, the card says so. An arrival time is labelled as an estimate. Flightradar24 and FlightAware stay one tap away for the official record.
+- **Place alerts.** With **Alertas** on, an open place card can show severe natural events (NASA EONET), earthquakes of magnitude 2.5 or more from the last week (USGS), today's weather (Open-Meteo), and active fires only when a NASA FIRMS key is set on the server. Coordinates sent to those public APIs are rounded to about a kilometre. Each line links to its source. Results are cached on the device.
+- **Ask the map.** **Mapa** shows every place from unlocked notes, clustered. Type or speak a question. Without a key, a plain text filter still works. With the same key used by **Proponha uma ideia**, the model receives only place names, rounded coordinates, note titles, and a short snippet, never a locked note, and only after a one-time notice. **Desenhar área** collects what is inside into a new note called Roteiro and can export GeoJSON.
+
+![A flight on the note map](docs/assets/flight.png)
+
+![A place with weather and an alert](docs/assets/alert.png)
+
+![The map answering a question](docs/assets/ask.png)
+
+![A drawn area saved as Roteiro](docs/assets/roteiro.png)
+
 - **Maps.** **Mapa** in the `/` menu searches a place and drops a pin. A line that looks like an address can offer **Mostrar no mapa**, and nothing is looked up until you tap. **Como chegar** draws a walk, bike, or car route. Google Maps, Waze, and Apple Maps open as ordinary links. Tiles come from OpenFreeMap (OpenStreetMap data) and need no key. The public routing demo is used only when you ask for a route; an OpenRouteService key in **Ajustes** is optional and stays on the device. A locked note does not load a map until it is unlocked. The network is called only when you create or open a map.
 
 ![A birthday note with a route](docs/assets/birthday-route.png)

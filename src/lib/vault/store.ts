@@ -35,7 +35,9 @@ type VaultState = {
   openNotes: Record<string, OpenNote>;
   sourceChosen: boolean;
   placeSuggest: boolean;
+  placeAlerts: boolean;
   setPlaceSuggest: (on: boolean) => void;
+  setPlaceAlerts: (on: boolean) => void;
   cells: NotebookCell[];
   messages: ChatMessage[];
   activeId: string;
@@ -183,6 +185,7 @@ export const useVault = create<VaultState>()(
       openNotes: {},
       sourceChosen: false,
       placeSuggest: true,
+      placeAlerts: true,
       hasDevicePin: typeof localStorage !== "undefined" && readPinRecord() !== null,
       cells: seedCells(),
       messages: [],
@@ -203,6 +206,7 @@ export const useVault = create<VaultState>()(
       setMode: (mode) => set({ mode }),
       setSourceChosen: (sourceChosen) => set({ sourceChosen, mode: sourceChosen ? "source" : "visual" }),
       setPlaceSuggest: (placeSuggest) => set({ placeSuggest }),
+      setPlaceAlerts: (placeAlerts) => set({ placeAlerts }),
       setDevicePin: async (pin) => {
         writePinRecord(await createPinRecord(pin));
         rememberDevicePin(pin);
@@ -688,6 +692,7 @@ export const useVault = create<VaultState>()(
           activeId: "n-routine",
           sourceChosen: false,
           placeSuggest: true,
+          placeAlerts: true,
           mode: "visual",
           view: "notes",
           confirm: null,
@@ -715,6 +720,7 @@ export const useVault = create<VaultState>()(
           openNotes: {},
           sourceChosen,
           placeSuggest: saved.placeSuggest !== false,
+          placeAlerts: saved.placeAlerts !== false,
           mode,
         };
       },
@@ -724,6 +730,7 @@ export const useVault = create<VaultState>()(
         ideas: state.ideas,
         sourceChosen: state.sourceChosen,
         placeSuggest: state.placeSuggest,
+        placeAlerts: state.placeAlerts,
         cells: state.cells,
         messages: state.messages,
         activeId: state.activeId,

@@ -4,6 +4,7 @@ import {
   Heading,
   Image as ImageIcon,
   MapPin,
+  Plane,
   Link2,
   List,
   ListChecks,
@@ -20,11 +21,14 @@ import { exportFigure, type ExportKind } from "@/figures/export-client";
 import { FIGURES } from "@/figures/geometry/machines";
 import { compressImage, deleteMedia, loadMedia, saveMedia } from "@/lib/media/db";
 import { addressLine, formatPlace, parsePlace, placesIn } from "@/lib/maps/place";
+import { findFlights } from "@/lib/world/flight";
+import { FlightCard } from "./flight-card";
 import { deviceGeoCache, searchPlaces } from "@/lib/maps/cache";
 import { browserGeocoder } from "@/lib/maps/geocode";
-import { PlaceSearch, PlaceStack } from "./place-view";
+import { PlaceSearch, PlaceStack, type AirMark } from "./place-view";
 import { insertAfter, mentionQuery, removeBlock, replaceBlock, slashQuery, SLASH_ITEMS, stripTrigger, type SlashKind } from "@/lib/vault/blocks";
 import {
+  flightCallsign,
   formatFigureEmbed,
   formatMediaEmbed,
   listItems,
@@ -49,6 +53,7 @@ const ICONS = {
   camera: Camera,
   video: Video,
   map: MapPin,
+  flight: Plane,
   note: Link2,
   heading: Heading,
   list: List,
@@ -227,6 +232,9 @@ export function VisualEditor({ noteId, body, onChange }: { noteId: string; body:
   const [cameraError, setCameraError] = useState("");
   const [cameraOn, setCameraOn] = useState(false);
   const [placeAt, setPlaceAt] = useState<number | null>(null);
+  const [flightAt, setFlightAt] = useState<number | null>(null);
+  const [flightNo, setFlightNo] = useState("");
+  const [airMarks, setAirMarks] = useState<AirMark[]>([]);
   const [suggestNote, setSuggestNote] = useState("");
   const [recording, setRecording] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
@@ -360,6 +368,11 @@ export function VisualEditor({ noteId, body, onChange }: { noteId: string; body:
     }
     if (id === "map") {
       setPlaceAt(menu.index);
+      closeMenu();
+      return;
+    }
+    if (id === "flight") {
+      setFlightAt(menu.index);
       closeMenu();
       return;
     }
@@ -538,7 +551,18 @@ export function VisualEditor({ noteId, body, onChange }: { noteId: string; body:
     if (parsePlace(block.raw)) {
       const first = placesIn(body)[0]?.index;
       if (first !== index) return null;
-      return <PlaceStack markdown={body} onChange={write} />;
+      return <PlaceStack markdown={body} onChange={write} aircraft={airMarks} />;
+    }
+    const flight = flightCallsign(block.raw);
+    if (flight) {
+      const hasPlace = placesIn(body).length > 0;
+      return (
+        <FlightCard
+          callsign={flight}
+          showMap={!hasPlace}
+          onAir={(mark) => setAirMarks((list) => (mark ? [mark] : list.filter((item) => item.label !== flight)))}
+        />
+      );
     }
     if (media) {
       return (
@@ -610,10 +634,17 @@ export function VisualEditor({ noteId, body, onChange }: { noteId: string; body:
       />
     );
     const addressHint = placeSuggest && block.kind === "paragraph" && !parsePlace(blocks[index + 1]?.raw ?? "") ? addressLine(block.raw) : null;
-    if (!addressHint) return field;
+    const flightHint = findFlights(block.raw).find((hit) => !blocks.some((item) => flightCallsign(item.raw) === hit.callsign));
+    if (!addressHint && !flightHint) return field;
     return (
       <div className="flex flex-col items-start gap-1">
         {field}
+        {flightHint ? (
+          <button type="button" className="h-9 text-sm text-copper" onClick={() => write(insertAfter(body, index, `![[flight:${flightHint.callsign}]]`))}>
+            Acompanhar voo
+          </button>
+        ) : null}
+        {addressHint ? (
         <button
           type="button"
           className="h-9 text-sm text-copper"
@@ -633,6 +664,7 @@ export function VisualEditor({ noteId, body, onChange }: { noteId: string; body:
         >
           Mostrar no mapa
         </button>
+        ) : null}
         {suggestNote ? <p className="text-sm text-muted">{suggestNote}</p> : null}
       </div>
     );
@@ -669,6 +701,26 @@ export function VisualEditor({ noteId, body, onChange }: { noteId: string; body:
         Bloco
       </button>
       {menuBox}
+      {flightAt !== null ? (
+        <form
+          className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md rounded-t-2xl border border-line bg-paper-2 p-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const callsign = flightNo.replace(/\s+/g, "").toUpperCase();
+            if (!/^[A-Z]{2,3}\d{2,4}$/.test(callsign) || flightAt === null) return;
+            const cleaned = stripTrigger(blocks[flightAt]?.raw ?? "");
+            const line = `![[flight:${callsign}]]`;
+            const base = replaceBlock(body, flightAt, cleaned);
+            write(cleaned ? insertAfter(base, flightAt, line) : replaceBlock(body, flightAt, line));
+            setFlightAt(null);
+            setFlightNo("");
+          }}
+        >
+          <p className="font-serif text-xl">Voo</p>
+          <input value={flightNo} onChange={(event) => setFlightNo(event.target.value)} placeholder="LA8084" aria-label="Número do voo" className="mt-2 h-11 w-full rounded-md border border-line bg-paper px-3 text-base outline-none" />
+          <button type="submit" className="mt-2 h-11 rounded-md bg-copper px-4 text-sm text-paper-2">Acompanhar</button>
+        </form>
+      ) : null}
       {placeAt !== null ? (
         <PlaceSearch
           onClose={() => setPlaceAt(null)}
