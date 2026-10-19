@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { wikilinkTitles } from "@/lib/vault/markdown";
-import { fold } from "@/lib/vault/retrieve";
+import { fold, presentNotes } from "@/lib/vault/retrieve";
 import { useVault } from "@/lib/vault/store";
 
 type GraphNode = { id: string; title: string; x: number; y: number };
@@ -24,7 +24,9 @@ function layoutNodes(notes: { id: string; title: string }[], width: number, heig
 }
 
 export function GraphView() {
-  const notes = useVault((state) => state.notes);
+  const stored = useVault((state) => state.notes);
+  const openNotes = useVault((state) => state.openNotes);
+  const notes = useMemo(() => presentNotes(stored, openNotes), [stored, openNotes]);
   const theme = useVault((state) => state.theme);
   const select = useVault((state) => state.select);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -39,7 +41,7 @@ export function GraphView() {
     const pairs: [string, string][] = [];
     const seen = new Set<string>();
     for (const note of notes) {
-      for (const title of wikilinkTitles(note.body)) {
+      for (const title of wikilinkTitles(note.seal && !openNotes[note.id] ? "" : note.body)) {
         const target = byTitle.get(fold(title));
         if (!target || target === note.id) continue;
         const key = [note.id, target].sort().join(":");
@@ -49,7 +51,7 @@ export function GraphView() {
       }
     }
     return pairs;
-  }, [notes]);
+  }, [notes, openNotes]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

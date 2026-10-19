@@ -41,7 +41,7 @@ export function compileIdea(idea: SavedIdea): Machine {
     fig: "ideia",
     title: idea.title,
     blurb: idea.blurb,
-    hint: "arraste · A desmonta",
+    hint: "toque para desmontar",
     caption: idea.caption,
     width: WIDTH,
     height: HEIGHT,

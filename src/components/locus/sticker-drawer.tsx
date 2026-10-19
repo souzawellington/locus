@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 import { FigureHost } from "@/figures/FigureHost";
 import { exportFigure, type ExportKind } from "@/figures/export-client";
 import { FIGURES } from "@/figures/geometry/machines";
-import { formatFigureEmbed } from "@/lib/vault/markdown";
 import { MyIdeas } from "@/components/locus/propose-idea";
 import { useVault } from "@/lib/vault/store";
 
@@ -108,7 +107,6 @@ export function StickerDrawer({ open, onClose }: { open: boolean; onClose: () =>
                       Animado
                     </button>
                   </div>
-                  <p className="mt-2 font-mono text-[11px] text-muted">{formatFigureEmbed(embed)}</p>
                 </li>
               );
             })}
@@ -126,7 +124,6 @@ export function StickerDrawer({ open, onClose }: { open: boolean; onClose: () =>
                     <FigureHost embed={embed} showExport={false} />
                   </div>
                   <p className="font-serif text-lg text-ink">{idea.title}</p>
-                  <p className="font-mono text-xs text-muted">{idea.slug}</p>
                   <div className="mt-3 flex flex-wrap gap-1">
                     <button type="button" className="h-9 rounded-md bg-copper px-3 text-xs text-paper-2" onClick={() => { insertFigure(idea.slug, embed); onClose(); }}>
                       Na nota

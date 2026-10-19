@@ -12,11 +12,30 @@ function at(age: number): { createdAt: number; updatedAt: number } {
 export function seedNotes(): Note[] {
   return [
     {
+      id: "n-recipe",
+      title: "Bolo de laranja",
+      ...at(minute),
+      body: `Um bolo de uma tigela. Toque em + e escolha Foto para a laranja, ou Câmera para tirar agora. Vídeo também cabe, se quiser o ponto da massa.
+
+## Massa
+
+- [ ] 2 laranjas
+- [ ] 1 xícara de açúcar
+- [ ] 3 ovos
+- [ ] 1 xícara de farinha
+
+Asse até dourar. Digite @ para ligar outra nota. A das máquinas é [[Figuras do cofre]].
+
+> Esprema as laranjas com a casca, sem a semente.`,
+    },
+    {
       id: "n-figures",
       title: "Figuras do cofre",
       ...at(2 * minute),
       canvas: { x: 1040, y: 520, w: 280, h: 160 },
-      body: `Cada figura é uma máquina pequena. O mecanismo é o conceito: o cabo é a ligação, o componedor é a fusão, a prensa espera o sim. Passe o cursor ou use as setas. A desmonta, quando a peça se separa.
+      body: `Cada figura é uma máquina pequena. Toque em + ou digite / e escolha Figura ou Figurinha. Toque a figura para o tamanho, animar, girar ou desmontar. Digite @ para ligar outra nota pelo nome.
+
+O mecanismo é o conceito: o cabo é a ligação, o componedor é a fusão, a prensa espera o sim. Passe o cursor ou use as setas. A desmonta, quando a peça se separa.
 
 ![[figure:crdt|sticker|animated|tilt:-2]]
 
@@ -73,7 +92,7 @@ Isto conversa com [[Edição em blocos]], porque um bloco com identidade estáve
 
 A base clássica dessa ideia guarda um modelo transacional do documento, com histórico. Por cima, esquemas descrevem blocos tipados. O markdown continua sendo a forma portátil: o que você lê em outro programa daqui a dez anos não depende de um formato privado.
 
-Reordenar não é enfeite. Quando a unidade de edição é o bloco, mover um argumento para cima muda a estrutura sem corromper o resto. A busca e o Atlas indexam esses mesmos blocos, então a unidade de escrita e a unidade de recuperação coincidem.
+Reordenar não é enfeite. Quando a unidade de edição é o bloco, mover um argumento para cima muda a estrutura sem corromper o resto. A busca e o Atlas indexam esses mesmos blocos, então a unidade de escrita e a unidade de recuperação coincidem. No Locus, / abre o menu de blocos e @ liga uma nota pelo nome.
 
 Veja também [[Sincronização local-first]] e [[Canvas espacial]].
 
@@ -86,7 +105,7 @@ Veja também [[Sincronização local-first]] e [[Canvas espacial]].
       canvas: { x: 720, y: 80, w: 280, h: 170 },
       body: `No início de uma ideia, a leitura de cima para baixo atrapalha. Um canvas infinito deixa notas, trechos e diagramas ocuparem um plano. A proximidade vira significado: o que está perto foi aproximado de propósito.
 
-Cada cartão é uma nota inteira, não um recado órfão. Mover o cartão não duplica o texto. O corpo continua sendo o mesmo markdown de [[Edição em blocos]], só que visto de cima. As linhas entre cartões são as ligações \`[[wiki]]\`, o mesmo vínculo que o grafo enxerga.
+Cada cartão é uma nota inteira, não um recado órfão. Mover o cartão não duplica o texto. O corpo continua sendo o mesmo da [[Edição em blocos]], só que visto de cima. As linhas entre cartões são as ligações entre notas, o mesmo vínculo que o grafo enxerga.
 
 Isso serve para arquiteturas, argumentos e leituras longas. Você espalha as fontes, desenha o fluxo com a posição e só então volta à prosa linear. O canvas é uma vista, não um segundo cofre. O protocolo de ação continua sendo o [[Protocolo MCP]].`,
     },

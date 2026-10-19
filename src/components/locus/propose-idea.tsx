@@ -122,8 +122,7 @@ export function MyIdeas() {
                   setEdit(null);
                 }}
               >
-                <input className="h-10 rounded-md border border-line bg-paper px-3 text-sm" value={edit.title} onChange={(event) => setEdit({ ...edit, title: event.target.value })} aria-label="Título" />
-                <input className="h-10 rounded-md border border-line bg-paper px-3 font-mono text-xs" value={edit.next} onChange={(event) => setEdit({ ...edit, next: event.target.value })} aria-label="Slug" />
+                <input className="h-10 rounded-md border border-line bg-paper px-3 text-sm" value={edit.title} onChange={(event) => setEdit({ ...edit, title: event.target.value, next: event.target.value })} aria-label="Título" />
                 <div className="flex gap-2">
                   <button type="submit" className="h-9 rounded-md bg-copper px-3 text-xs text-paper-2">Guardar nome</button>
                   <button type="button" className="h-9 rounded-md px-3 text-xs text-muted" onClick={() => setEdit(null)}>Cancelar</button>
@@ -132,7 +131,6 @@ export function MyIdeas() {
             ) : (
               <>
                 <p className="text-ink">{idea.title}</p>
-                <p className="font-mono text-xs text-muted">{idea.slug}</p>
                 <div className="mt-2 flex gap-2">
                   <button type="button" className="h-9 rounded-md border border-line px-3 text-xs" onClick={() => setEdit({ slug: idea.slug, title: idea.title, next: idea.slug })}>
                     Renomear

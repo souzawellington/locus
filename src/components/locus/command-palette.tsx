@@ -1,10 +1,10 @@
 import { Command } from "cmdk";
 import { downloadText, slugify } from "@/lib/vault/format";
 import { FIGURES } from "@/figures/geometry/machines";
-import { formatFigureEmbed } from "@/lib/vault/markdown";
 import { PATTERNS } from "@/lib/vault/patterns";
+import { presentNotes } from "@/lib/vault/retrieve";
 import { useVault } from "@/lib/vault/store";
-import type { WorkspaceView, WriteMode } from "@/lib/vault/types";
+import type { WorkspaceView } from "@/lib/vault/types";
 
 const views: { id: WorkspaceView; label: string }[] = [
   { id: "notes", label: "Ir para Notas" },
@@ -14,21 +14,17 @@ const views: { id: WorkspaceView; label: string }[] = [
   { id: "atlas", label: "Ir para Atlas" },
 ];
 
-const modes: { id: WriteMode; label: string }[] = [
-  { id: "source", label: "Escrita em markdown" },
-  { id: "blocks", label: "Escrita em blocos" },
-  { id: "read", label: "Leitura renderizada" },
-];
-
 export function CommandPalette({ shortcut }: { shortcut: string }) {
   const open = useVault((state) => state.paletteOpen);
   const setPalette = useVault((state) => state.setPalette);
   const notes = useVault((state) => state.notes);
+  const openNotes = useVault((state) => state.openNotes);
   const activeId = useVault((state) => state.activeId);
   const createNote = useVault((state) => state.createNote);
   const select = useVault((state) => state.select);
   const setView = useVault((state) => state.setView);
   const setMode = useVault((state) => state.setMode);
+  const setSourceChosen = useVault((state) => state.setSourceChosen);
   const toggleTheme = useVault((state) => state.toggleTheme);
   const setFocus = useVault((state) => state.setFocus);
   const focusMode = useVault((state) => state.focusMode);
@@ -42,7 +38,8 @@ export function CommandPalette({ shortcut }: { shortcut: string }) {
     setPalette(false);
   }
 
-  const active = notes.find((note) => note.id === activeId);
+  const readable = presentNotes(notes, openNotes);
+  const active = readable.find((note) => note.id === activeId);
 
   return (
     <Command.Dialog
@@ -66,11 +63,15 @@ export function CommandPalette({ shortcut }: { shortcut: string }) {
           <Command.Item className="rounded-md px-3 py-3 text-sm" onSelect={() => { setFocus(!focusMode); close(); }}>
             {focusMode ? "Sair do foco" : "Modo foco"}
           </Command.Item>
-          {modes.map((mode) => (
-            <Command.Item key={mode.id} className="rounded-md px-3 py-3 text-sm" onSelect={() => { setMode(mode.id); setView("notes"); close(); }}>
-              {mode.label}
-            </Command.Item>
-          ))}
+          <Command.Item className="rounded-md px-3 py-3 text-sm" onSelect={() => { setSourceChosen(false); setMode("visual"); setView("notes"); close(); }}>
+            Editor visual
+          </Command.Item>
+          <Command.Item className="rounded-md px-3 py-3 text-sm" onSelect={() => { setMode("read"); setView("notes"); close(); }}>
+            Leitura
+          </Command.Item>
+          <Command.Item className="rounded-md px-3 py-3 text-sm" onSelect={() => { setSourceChosen(true); setView("notes"); close(); }}>
+            Ver código
+          </Command.Item>
           <Command.Item
             className="rounded-md px-3 py-3 text-sm"
             onSelect={() => {
@@ -84,7 +85,10 @@ export function CommandPalette({ shortcut }: { shortcut: string }) {
           <Command.Item
             className="rounded-md px-3 py-3 text-sm"
             onSelect={() => {
-              const text = notes.map((note) => `# ${note.title}\n\n${note.body.trim()}\n`).join("\n---\n\n");
+              const text = readable
+                .filter((note) => !(note.seal && !openNotes[note.id]))
+                .map((note) => `# ${note.title}\n\n${note.body.trim()}\n`)
+                .join("\n---\n\n");
               downloadText("locus-cofre.md", text);
               close();
             }}
@@ -113,8 +117,7 @@ export function CommandPalette({ shortcut }: { shortcut: string }) {
               className="rounded-md px-3 py-3 text-sm"
               onSelect={() => insertFigure(figure.slug)}
             >
-              <span className="font-mono text-xs text-copper">{figure.fig}</span>
-              <span className="mt-1 block text-ink">{figure.title}</span>
+              <span className="block text-ink">{figure.title}</span>
               <span className="block text-xs text-muted">{figure.blurb}</span>
             </Command.Item>
           ))}
@@ -123,12 +126,11 @@ export function CommandPalette({ shortcut }: { shortcut: string }) {
           {FIGURES.map((figure, index) => (
             <Command.Item
               key={`sticker-${figure.slug}`}
-              value={`figurinha ${figure.slug} ${figure.title} ${formatFigureEmbed({ slug: figure.slug, size: "sticker", motion: "animated" })}`}
+              value={`figurinha ${figure.title} ${figure.blurb}`}
               className="rounded-md px-3 py-3 text-sm"
               onSelect={() => insertFigure(figure.slug, { size: "sticker", motion: "animated", tilt: ((index % 5) - 2) })}
             >
-              <span className="font-mono text-xs text-copper">adesivo</span>
-              <span className="mt-1 block text-ink">{figure.title}</span>
+              <span className="block text-ink">{figure.title}</span>
               <span className="block text-xs text-muted">Animada, na nota aberta</span>
             </Command.Item>
           ))}
@@ -139,8 +141,7 @@ export function CommandPalette({ shortcut }: { shortcut: string }) {
               className="rounded-md px-3 py-3 text-sm"
               onSelect={() => insertFigure(idea.slug)}
             >
-              <span className="font-mono text-xs text-copper">{idea.slug}</span>
-              <span className="mt-1 block text-ink">{idea.title}</span>
+              <span className="block text-ink">{idea.title}</span>
             </Command.Item>
           ))}
         </Command.Group>
@@ -166,7 +167,7 @@ export function CommandPalette({ shortcut }: { shortcut: string }) {
           ))}
         </Command.Group>
         <Command.Group heading="Notas">
-          {notes.map((note) => (
+          {readable.map((note) => (
             <Command.Item
               key={note.id}
               value={`${note.title} ${note.id}`}
