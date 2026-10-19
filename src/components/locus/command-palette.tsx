@@ -1,5 +1,6 @@
 import { Command } from "cmdk";
 import { downloadText, slugify } from "@/lib/vault/format";
+import { FIGURES } from "@/figures/geometry/machines";
 import { PATTERNS } from "@/lib/vault/patterns";
 import { useVault } from "@/lib/vault/store";
 import type { WorkspaceView, WriteMode } from "@/lib/vault/types";
@@ -32,6 +33,7 @@ export function CommandPalette({ shortcut }: { shortcut: string }) {
   const focusMode = useVault((state) => state.focusMode);
   const setConfirm = useVault((state) => state.setConfirm);
   const preparePattern = useVault((state) => state.preparePattern);
+  const insertFigure = useVault((state) => state.insertFigure);
 
   function close() {
     setPalette(false);
@@ -89,6 +91,20 @@ export function CommandPalette({ shortcut }: { shortcut: string }) {
           <Command.Item className="rounded-md px-3 py-3 text-sm" onSelect={() => { setConfirm({ kind: "reset" }); close(); }}>
             Restaurar notas de exemplo
           </Command.Item>
+        </Command.Group>
+        <Command.Group heading="Figuras">
+          {FIGURES.map((figure) => (
+            <Command.Item
+              key={figure.slug}
+              value={`figura ${figure.slug} ${figure.title} ${figure.blurb}`}
+              className="rounded-md px-3 py-3 text-sm"
+              onSelect={() => insertFigure(figure.slug)}
+            >
+              <span className="font-mono text-xs text-copper">{figure.fig}</span>
+              <span className="mt-1 block text-ink">{figure.title}</span>
+              <span className="block text-xs text-muted">{figure.blurb}</span>
+            </Command.Item>
+          ))}
         </Command.Group>
         <Command.Group heading="Biblioteca dos Profissionais">
           {PATTERNS.map((pattern) => (

@@ -97,6 +97,59 @@
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
 
+.locus-figure.iso[data-theme="light"] {
+  --anatomy-page: #f3efe6;
+  --anatomy-card: #faf7f1;
+  --anatomy-text: #6d655c;
+  --anatomy-strong: #1a1714;
+  --anatomy-muted: #6d655c;
+  --anatomy-paper: #faf7f1;
+  --anatomy-face: #f3efe6;
+  --anatomy-top: #f3efe6;
+  --anatomy-shade-0: #e2d9c9;
+  --anatomy-shade-1: #e8e0d2;
+  --anatomy-shade-2: #efe7db;
+  --anatomy-shade-3: #f6f1e8;
+  --anatomy-lit-top: #f3e4d4;
+  --anatomy-lit-shade: #e7cdb8;
+  --anatomy-hi: #1a1714;
+  --anatomy-mid: #5c554c;
+  --anatomy-lo: #8a8176;
+  --anatomy-faint: #c9bfb0;
+  --anatomy-lit: #9c4520;
+  --anatomy-halo: #c4b8a4;
+  --anatomy-halo-opacity: 0.28;
+  --anatomy-dot: #1a1714;
+  --anatomy-weight: 0.9px;
+  margin: 0;
+}
+
+.locus-figure .iso-figure {
+  margin: 0;
+}
+
+.locus-figure .iso-plate {
+  background: #faf7f1;
+  box-shadow: 0 0 0 1px #e2d9c9;
+}
+
+.locus-figure[data-size="sticker"] {
+  max-width: 240px;
+}
+
+.locus-figure[data-size="sticker"] .iso-plate {
+  padding: 34px 8px 42px;
+}
+
+.locus-figure[data-size="sticker"] .iso-legend,
+.locus-figure[data-size="sticker"] .iso-plate-corner[data-corner="hint"] {
+  display: none;
+}
+
+.locus-figure[data-size="full"] {
+  width: 100%;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

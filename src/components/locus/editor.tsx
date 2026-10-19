@@ -1,5 +1,6 @@
 import { Code2, Download, Eye, Frame, Rows3, Trash2 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { FIGURES } from "@/figures/geometry/machines";
 import { downloadText, exactTime, relativeTime, slugify, wordCount } from "@/lib/vault/format";
 import { kindLabel, parseBlocks, serializeBlocks, wikilinkTitles, type MdBlock } from "@/lib/vault/markdown";
 import { findNote } from "@/lib/vault/retrieve";
@@ -123,6 +124,8 @@ export function Editor() {
   const commitRename = useVault((state) => state.commitRename);
   const setConfirm = useVault((state) => state.setConfirm);
   const placeOnCanvas = useVault((state) => state.placeOnCanvas);
+  const insertFigure = useVault((state) => state.insertFigure);
+  const [figuresOpen, setFiguresOpen] = useState(false);
   const setView = useVault((state) => state.setView);
   const openWiki = useVault((state) => state.openWiki);
   const focusTick = useVault((state) => state.focusTick);
@@ -201,6 +204,14 @@ export function Editor() {
           </button>
           <button
             type="button"
+            aria-expanded={figuresOpen}
+            className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-sm text-muted"
+            onClick={() => setFiguresOpen((open) => !open)}
+          >
+            Figura
+          </button>
+          <button
+            type="button"
             className="ml-auto inline-flex h-10 items-center gap-2 rounded-md px-3 text-sm text-danger"
             onClick={() => setConfirm({ kind: "delete", id: note.id })}
           >
@@ -208,6 +219,23 @@ export function Editor() {
             Excluir
           </button>
         </div>
+        {figuresOpen ? (
+          <div className="flex flex-wrap gap-2" role="list" aria-label="Figuras">
+            {FIGURES.map((figure) => (
+              <button
+                key={figure.slug}
+                type="button"
+                className="h-10 rounded-full border border-line px-3 text-sm text-ink"
+                onClick={() => {
+                  insertFigure(figure.slug);
+                  setFiguresOpen(false);
+                }}
+              >
+                {figure.title}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         <input
           id="locus-title"
@@ -236,7 +264,7 @@ export function Editor() {
             ref={bodyRef}
             value={note.body}
             aria-label="Markdown"
-            placeholder="Escreva em markdown. Ligue ideias com [[outra nota]]."
+            placeholder="Escreva em markdown. Ligue ideias com [[outra nota]]. Uma figura entra como ![[figure:wikilinks]]."
             onChange={(event) => updateBody(note.id, event.target.value)}
             className="w-full resize-none bg-transparent font-sans text-base leading-7 text-ink outline-none placeholder:text-muted"
           />

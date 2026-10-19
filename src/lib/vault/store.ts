@@ -39,6 +39,7 @@ type VaultState = {
   select: (id: string) => void;
   createNote: (partial?: { title?: string; body?: string }) => void;
   updateBody: (id: string, body: string) => void;
+  insertFigure: (slug: string) => void;
   updateTitle: (id: string, title: string) => void;
   commitRename: (id: string, from: string, to: string) => void;
   deleteNote: (id: string) => void;
@@ -173,6 +174,23 @@ export const useVault = create<VaultState>()(
         set({
           notes: get().notes.map((note) => (note.id === id ? { ...note, body, updatedAt: Date.now() } : note)),
         }),
+      insertFigure: (slug) => {
+        const line = `![[figure:${slug}]]`;
+        const state = get();
+        const note = state.notes.find((item) => item.id === state.activeId);
+        if (!note) {
+          const created = blank("Figura", `${line}\n`);
+          set({ notes: [created, ...state.notes], activeId: created.id, view: "notes", mode: "read", paletteOpen: false });
+          return;
+        }
+        const body = note.body.includes(line) ? note.body : `${note.body.trim()}\n\n${line}\n`;
+        set({
+          notes: state.notes.map((item) => (item.id === note.id ? { ...item, body, updatedAt: Date.now() } : item)),
+          view: "notes",
+          mode: "read",
+          paletteOpen: false,
+        });
+      },
       updateTitle: (id, title) =>
         set({
           notes: get().notes.map((note) => (note.id === id ? { ...note, title } : note)),
