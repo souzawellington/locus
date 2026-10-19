@@ -10,6 +10,8 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
   const clearDevicePin = useVault((state) => state.clearDevicePin);
   const placeSuggest = useVault((state) => state.placeSuggest);
   const setPlaceSuggest = useVault((state) => state.setPlaceSuggest);
+  const placeAlerts = useVault((state) => state.placeAlerts);
+  const setPlaceAlerts = useVault((state) => state.setPlaceAlerts);
   const [pin, setPin] = useState("");
   const [message, setMessage] = useState("");
   const [ors, setOrs] = useState("");
@@ -41,6 +43,13 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
           <span>
             <span className="block text-ink">Sugerir mapa</span>
             <span className="block text-muted">Quando uma linha parecer um endereço, um botão oferece o mapa. Nada é buscado antes do toque.</span>
+          </span>
+        </label>
+        <label className="mt-5 flex min-h-11 items-start gap-3 text-sm">
+          <input type="checkbox" className="mt-1 size-5" checked={placeAlerts} onChange={(event) => setPlaceAlerts(event.target.checked)} />
+          <span>
+            <span className="block text-ink">Alertas</span>
+            <span className="block text-muted">Tempo, terremotos e eventos perto de um lugar salvo. A busca só acontece com a nota aberta, e a coordenada vai arredondada.</span>
           </span>
         </label>
         <h3 className="mt-6 font-serif text-xl text-ink">Rotas</h3>

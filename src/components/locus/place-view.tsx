@@ -6,6 +6,7 @@ import { formatDistance, formatDuration, placesIn, replacePlace, type Place, typ
 import { browserRouter, type RouteLine } from "@/lib/maps/route";
 import { removeBlock } from "@/lib/vault/blocks";
 import { cn } from "@/lib/utils";
+import { PlaceAlerts } from "./place-alerts";
 
 const MODES: { id: TravelMode; label: string }[] = [
   { id: "car", label: "Carro" },
@@ -36,8 +37,10 @@ function webgl(): boolean {
   }
 }
 
+export type AirMark = { lat: number; lon: number; heading: number; label: string };
+
 type MapHandle = {
-  sync(places: Place[], route: [number, number][] | null): void;
+  sync(places: Place[], route: [number, number][] | null, aircraft: AirMark[]): void;
   remove(): void;
 };
 
@@ -59,13 +62,20 @@ async function mountVector(el: HTMLElement): Promise<MapHandle> {
   });
   const markers: { remove(): void }[] = [];
   return {
-    sync(places, route) {
+    sync(places, route, aircraft = []) {
       markers.splice(0).forEach((marker) => marker.remove());
       places.forEach((place, index) => {
         const node = document.createElement("div");
         node.className = "locus-pin";
         node.textContent = String(index + 1);
         markers.push(new maplibregl.Marker({ element: node, anchor: "center" }).setLngLat([place.lon, place.lat]).addTo(map));
+      });
+      aircraft.forEach((plane) => {
+        const node = document.createElement("div");
+        node.className = "locus-plane";
+        node.style.transform = `rotate(${plane.heading}deg)`;
+        node.title = plane.label;
+        markers.push(new maplibregl.Marker({ element: node, anchor: "center" }).setLngLat([plane.lon, plane.lat]).addTo(map));
       });
       const geometry = route && route.length > 1 ? { type: "LineString" as const, coordinates: route } : { type: "LineString" as const, coordinates: [] as [number, number][] };
       const source = map.getSource("locus-route") as { setData?: (value: unknown) => void } | undefined;
@@ -76,6 +86,7 @@ async function mountVector(el: HTMLElement): Promise<MapHandle> {
       }
       const bounds = new maplibregl.LngLatBounds();
       places.forEach((place) => bounds.extend([place.lon, place.lat]));
+      aircraft.forEach((plane) => bounds.extend([plane.lon, plane.lat]));
       route?.forEach((point) => bounds.extend(point));
       if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 36, maxZoom: 15, duration: 0 });
     },
@@ -96,7 +107,7 @@ async function mountRaster(el: HTMLElement): Promise<MapHandle> {
   }).addTo(map);
   const drawn: { remove(): void }[] = [];
   return {
-    sync(places, route) {
+    sync(places, route, aircraft = []) {
       drawn.splice(0).forEach((layer) => layer.remove());
       const bounds = L.latLngBounds([]);
       places.forEach((place, index) => {
@@ -108,6 +119,11 @@ async function mountRaster(el: HTMLElement): Promise<MapHandle> {
         });
         drawn.push(L.marker([place.lat, place.lon], { icon }).addTo(map));
         bounds.extend([place.lat, place.lon]);
+      });
+      aircraft.forEach((plane) => {
+        const icon = L.divIcon({ className: "locus-pin-wrap", html: `<span class="locus-plane" style="transform:rotate(${plane.heading}deg)"></span>`, iconSize: [18, 18], iconAnchor: [9, 9] });
+        drawn.push(L.marker([plane.lat, plane.lon], { icon }).addTo(map));
+        bounds.extend([plane.lat, plane.lon]);
       });
       if (route && route.length > 1) {
         const points = route.map(([lon, lat]) => L.latLng(lat, lon));
@@ -151,13 +167,13 @@ function MapPlaceholder({ places }: { places: Place[] }) {
   );
 }
 
-function PlaceMap({ places, route }: { places: Place[]; route: [number, number][] | null }) {
+export function PlaceMap({ places, route, aircraft = [] }: { places: Place[]; route: [number, number][] | null; aircraft?: AirMark[] }) {
   const host = useRef<HTMLDivElement>(null);
   const handle = useRef<MapHandle | null>(null);
   const [offline, setOffline] = useState(false);
-  const data = useRef({ places, route });
-  data.current = { places, route };
-  const signature = `${places.map((place) => `${place.lat.toFixed(5)},${place.lon.toFixed(5)}`).join("|")}:${route?.map((point) => point.join(",")).join(";") ?? ""}`;
+  const data = useRef({ places, route, aircraft });
+  data.current = { places, route, aircraft };
+  const signature = `${places.map((place) => `${place.lat.toFixed(5)},${place.lon.toFixed(5)}`).join("|")}:${route?.map((point) => point.join(",")).join(";") ?? ""}:${aircraft.map((plane) => plane.label).join(",")}`;
 
   useEffect(() => {
     const el = host.current;
@@ -170,7 +186,7 @@ function PlaceMap({ places, route }: { places: Place[]; route: [number, number][
           return;
         }
         handle.current = next;
-        next.sync(data.current.places, data.current.route);
+        next.sync(data.current.places, data.current.route, data.current.aircraft);
       })
       .catch(() => {
         if (!dead) setOffline(true);
@@ -183,10 +199,10 @@ function PlaceMap({ places, route }: { places: Place[]; route: [number, number][
   }, []);
 
   useEffect(() => {
-    handle.current?.sync(places, route);
-  }, [signature, places, route]);
+    handle.current?.sync(places, route, aircraft);
+  }, [signature, places, route, aircraft]);
 
-  if (!places.length) return null;
+  if (!places.length && !aircraft.length) return null;
   if (offline) return <MapPlaceholder places={places} />;
   return (
     <div data-testid="place-map">
@@ -271,6 +287,7 @@ function PlaceCard({
       <p className="text-sm text-muted">{number}</p>
       <h3 className="font-serif text-xl text-ink">{place.name}</h3>
       <p className="text-sm text-muted">{place.address}</p>
+      <PlaceAlerts lat={place.lat} lon={place.lon} />
       {summary ? <p className="mt-1 text-sm text-ink">{summary}</p> : null}
       <button type="button" className="mt-2 h-10 text-sm text-copper" onClick={() => setOpen((value) => !value)}>
         Como chegar
@@ -325,7 +342,7 @@ function PlaceCard({
   );
 }
 
-export function PlaceStack({ markdown, onChange }: { markdown: string; onChange?: (next: string) => void }) {
+export function PlaceStack({ markdown, onChange, aircraft = [] }: { markdown: string; onChange?: (next: string) => void; aircraft?: AirMark[] }) {
   const found = placesIn(markdown);
   const places = found.map((item) => item.place);
   const [route, setRoute] = useState<{ index: number; line: RouteLine; from: LatLon } | null>(null);
@@ -334,7 +351,7 @@ export function PlaceStack({ markdown, onChange }: { markdown: string; onChange?
 
   return (
     <div className="flex flex-col gap-3">
-      <PlaceMap places={places} route={route?.line.coordinates ?? null} />
+      <PlaceMap places={places} route={route?.line.coordinates ?? null} aircraft={aircraft} />
       {found.map((item, number) => (
         <PlaceCard
           key={`${item.index}-${item.place.lat}`}

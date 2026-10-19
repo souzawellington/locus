@@ -7,6 +7,7 @@ export type SlashKind =
   | "camera"
   | "video"
   | "map"
+  | "flight"
   | "note"
   | "heading"
   | "list"
@@ -22,6 +23,7 @@ export const SLASH_ITEMS: { id: SlashKind; label: string; hint: string }[] = [
   { id: "camera", label: "Câmera", hint: "Tirar agora" },
   { id: "video", label: "Vídeo", hint: "Enviar ou gravar" },
   { id: "map", label: "Mapa", hint: "Lugar e caminho" },
+  { id: "flight", label: "Voo", hint: "Acompanhar um voo" },
   { id: "note", label: "Link para nota", hint: "Ligar outra nota" },
   { id: "heading", label: "Título", hint: "Uma seção" },
   { id: "list", label: "Lista", hint: "Itens soltos" },

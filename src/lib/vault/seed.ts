@@ -32,7 +32,7 @@ ${formatPlace({
       id: "n-tables",
       title: "Mesas do mês",
       ...at(20_000),
-      body: `Três mesas para escolher. O mapa junta os três endereços.
+      body: `Restaurantes anotados para o mês. O mapa junta os três endereços.
 
 ${formatPlace({
   name: "Bar da Dona Onça",
@@ -57,6 +57,14 @@ ${formatPlace({
   lon: -46.6797289,
   mode: "car",
 })}`,
+    },
+    {
+      id: "n-flight",
+      title: "Voo para Lisboa",
+      ...at(5_000),
+      body: `Saio no fim da tarde. O número é TP1352.
+
+![[flight:TP1352]]`,
     },
     {
       id: "n-recipe",
