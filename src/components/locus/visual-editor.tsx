@@ -3,6 +3,7 @@ import {
   Code,
   Heading,
   Image as ImageIcon,
+  MapPin,
   Link2,
   List,
   ListChecks,
@@ -18,6 +19,10 @@ import { FigureHost } from "@/figures/FigureHost";
 import { exportFigure, type ExportKind } from "@/figures/export-client";
 import { FIGURES } from "@/figures/geometry/machines";
 import { compressImage, deleteMedia, loadMedia, saveMedia } from "@/lib/media/db";
+import { addressLine, formatPlace, parsePlace, placesIn } from "@/lib/maps/place";
+import { deviceGeoCache, searchPlaces } from "@/lib/maps/cache";
+import { browserGeocoder } from "@/lib/maps/geocode";
+import { PlaceSearch, PlaceStack } from "./place-view";
 import { insertAfter, mentionQuery, removeBlock, replaceBlock, slashQuery, SLASH_ITEMS, stripTrigger, type SlashKind } from "@/lib/vault/blocks";
 import {
   formatFigureEmbed,
@@ -43,6 +48,7 @@ const ICONS = {
   photo: ImageIcon,
   camera: Camera,
   video: Video,
+  map: MapPin,
   note: Link2,
   heading: Heading,
   list: List,
@@ -211,6 +217,7 @@ export function VisualEditor({ noteId, body, onChange }: { noteId: string; body:
   const ensureNote = useVault((state) => state.ensureNote);
   const openWiki = useVault((state) => state.openWiki);
   const setIdeaOpen = useVault((state) => state.setIdeaOpen);
+  const placeSuggest = useVault((state) => state.placeSuggest);
   const blocks = parseBlocks(body);
   const figures = useMemo(() => [...FIGURES, ...(ideas ?? []).map((idea) => ({ slug: idea.slug, fig: "ideia", title: idea.title, blurb: idea.blurb }))], [ideas]);
   const [menu, setMenu] = useState<{ index: number; kind: "slash" | "mention"; query: string; panel: "main" | "figure" | "sticker" } | null>(null);
@@ -219,6 +226,8 @@ export function VisualEditor({ noteId, body, onChange }: { noteId: string; body:
   const [apart, setApart] = useState<Record<number, boolean>>({});
   const [cameraError, setCameraError] = useState("");
   const [cameraOn, setCameraOn] = useState(false);
+  const [placeAt, setPlaceAt] = useState<number | null>(null);
+  const [suggestNote, setSuggestNote] = useState("");
   const [recording, setRecording] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -346,6 +355,11 @@ export function VisualEditor({ noteId, body, onChange }: { noteId: string; body:
     }
     if (id === "video") {
       void openCamera(true);
+      closeMenu();
+      return;
+    }
+    if (id === "map") {
+      setPlaceAt(menu.index);
       closeMenu();
       return;
     }
@@ -521,6 +535,11 @@ export function VisualEditor({ noteId, body, onChange }: { noteId: string; body:
         </div>
       );
     }
+    if (parsePlace(block.raw)) {
+      const first = placesIn(body)[0]?.index;
+      if (first !== index) return null;
+      return <PlaceStack markdown={body} onChange={write} />;
+    }
     if (media) {
       return (
         <MediaCard
@@ -578,7 +597,7 @@ export function VisualEditor({ noteId, body, onChange }: { noteId: string; body:
       else if (block.kind === "quote") write(replaceBlock(body, index, text.split("\n").map((line) => `> ${line}`).join("\n")));
       else write(replaceBlock(body, index, text));
     };
-    return (
+    const field = (
       <InlineField
         value={shown}
         label={block.kind === "heading" ? "Título" : block.kind === "quote" ? "Citação" : "Texto"}
@@ -589,6 +608,33 @@ export function VisualEditor({ noteId, body, onChange }: { noteId: string; body:
         onMenuKey={onMenuKey}
         onWiki={openWiki}
       />
+    );
+    const addressHint = placeSuggest && block.kind === "paragraph" && !parsePlace(blocks[index + 1]?.raw ?? "") ? addressLine(block.raw) : null;
+    if (!addressHint) return field;
+    return (
+      <div className="flex flex-col items-start gap-1">
+        {field}
+        <button
+          type="button"
+          className="h-9 text-sm text-copper"
+          onClick={() => {
+            setSuggestNote("");
+            void searchPlaces(addressHint, browserGeocoder(), deviceGeoCache())
+              .then((hits) => {
+                const hit = hits[0];
+                if (!hit) {
+                  setSuggestNote("Não encontrei esse endereço.");
+                  return;
+                }
+                write(insertAfter(body, index, formatPlace({ ...hit, mode: "car" })));
+              })
+              .catch(() => setSuggestNote("Sem conexão para mostrar no mapa."));
+          }}
+        >
+          Mostrar no mapa
+        </button>
+        {suggestNote ? <p className="text-sm text-muted">{suggestNote}</p> : null}
+      </div>
     );
   }
 
@@ -623,6 +669,19 @@ export function VisualEditor({ noteId, body, onChange }: { noteId: string; body:
         Bloco
       </button>
       {menuBox}
+      {placeAt !== null ? (
+        <PlaceSearch
+          onClose={() => setPlaceAt(null)}
+          onPick={(hit) => {
+            const at = placeAt;
+            const cleaned = stripTrigger(blocks[at]?.raw ?? "");
+            const line = formatPlace({ ...hit, mode: "car" });
+            const base = replaceBlock(body, at, cleaned);
+            write(cleaned ? insertAfter(base, at, line) : replaceBlock(body, at, line));
+            setPlaceAt(null);
+          }}
+        />
+      ) : null}
       {cameraError ? <p className="text-sm text-danger">{cameraError}</p> : null}
       <div className={cameraOn ? "rounded-lg border border-line bg-paper-2 p-3" : "hidden"}>
         <video ref={liveVideo} autoPlay playsInline muted className="max-h-64 w-full rounded-md bg-ink/10" />

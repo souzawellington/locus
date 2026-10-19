@@ -170,6 +170,44 @@
   height: auto;
 }
 
+.locus-map {
+  position: relative;
+  z-index: 0;
+  height: 16rem;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+}
+
+.locus-map .maplibregl-map,
+.locus-map .leaflet-container {
+  height: 100%;
+  width: 100%;
+  background: var(--paper-2);
+  font-family: inherit;
+}
+
+.locus-pin-wrap {
+  background: transparent;
+  border: 0;
+}
+
+.locus-pin {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #9c4520;
+  color: #f3efe6;
+  font-size: 13px;
+  line-height: 1;
+  border: 2px solid #f3efe6;
+  box-shadow: 0 6px 14px rgba(26, 23, 20, 0.28);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

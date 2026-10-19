@@ -10,11 +10,14 @@ import {
   parseFigureEmbed,
   parseInline,
   parseMediaEmbed,
+  isPlaceLine,
   quoteText,
   type InlineNode,
   type MdBlock,
 } from "@/lib/vault/markdown";
 import { sessionKey } from "@/lib/vault/seal";
+import { placesIn } from "@/lib/maps/place";
+import { PlaceStack } from "./place-view";
 
 function Inline({ nodes, onWiki }: { nodes: InlineNode[]; onWiki: (title: string) => void }) {
   return (
@@ -85,7 +88,7 @@ function MediaRead({ id, caption, noteId }: { id: string; caption: string; noteI
   );
 }
 
-function BlockView({ block, onWiki, noteId }: { block: MdBlock; onWiki: (title: string) => void; noteId?: string }) {
+function BlockView({ block, onWiki, noteId, markdown, index }: { block: MdBlock; onWiki: (title: string) => void; noteId?: string; markdown: string; index: number }) {
   const media = parseMediaEmbed(block.raw);
   if (media) {
     return (
@@ -94,6 +97,11 @@ function BlockView({ block, onWiki, noteId }: { block: MdBlock; onWiki: (title: 
         {media.caption ? <figcaption className="text-sm text-muted">{media.caption}</figcaption> : null}
       </figure>
     );
+  }
+  if (block.kind === "place" || isPlaceLine(block.raw)) {
+    const first = placesIn(markdown)[0]?.index;
+    if (first !== index) return null;
+    return <PlaceStack markdown={markdown} />;
   }
   if (block.kind === "figure") {
     const embed = parseFigureEmbed(block.raw);
@@ -158,8 +166,8 @@ export function MarkdownView({ markdown, onWiki, noteId }: { markdown: string; o
   if (!blocks.length) return <p className="text-muted">Esta nota ainda não tem texto.</p>;
   return (
     <div className="flex flex-col gap-5">
-      {blocks.map((block) => (
-        <BlockView key={block.id} block={block} onWiki={onWiki} noteId={noteId} />
+      {blocks.map((block, index) => (
+        <BlockView key={block.id} block={block} onWiki={onWiki} noteId={noteId} markdown={markdown} index={index} />
       ))}
     </div>
   );
