@@ -1,5 +1,6 @@
 import isoCss from "../../.agents/skills/anatomy/kit/iso.css?raw";
-import { machineBySlug } from "./geometry/machines";
+import { useVault } from "@/lib/vault/store";
+import { resolveMachine } from "./idea/compile";
 import { loopSamples } from "./motion";
 
 const PALETTE = `.iso[data-theme="light"]{
@@ -45,7 +46,7 @@ function parseTranslate(value: string): [number, number] {
 
 /** Animated SVG, not GIF or WebP: the loop is the same model as the live sticker, and it needs no encoder. */
 function withLoop(svg: SVGSVGElement, slug: string): SVGSVGElement {
-  const machine = machineBySlug(slug);
+  const machine = resolveMachine(slug, useVault.getState().ideas ?? []);
   if (!machine) return svg;
   const samples = loopSamples(machine, 10);
   svg.querySelectorAll<SVGGElement>("[data-group]").forEach((node) => {

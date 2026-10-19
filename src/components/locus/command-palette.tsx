@@ -35,6 +35,8 @@ export function CommandPalette({ shortcut }: { shortcut: string }) {
   const setConfirm = useVault((state) => state.setConfirm);
   const preparePattern = useVault((state) => state.preparePattern);
   const insertFigure = useVault((state) => state.insertFigure);
+  const setIdeaOpen = useVault((state) => state.setIdeaOpen);
+  const ideas = useVault((state) => state.ideas) ?? [];
 
   function close() {
     setPalette(false);
@@ -94,6 +96,16 @@ export function CommandPalette({ shortcut }: { shortcut: string }) {
           </Command.Item>
         </Command.Group>
         <Command.Group heading="Figuras">
+          <Command.Item
+            className="rounded-md px-3 py-3 text-sm"
+            value="proponha uma ideia figura nova"
+            onSelect={() => {
+              close();
+              setIdeaOpen(true);
+            }}
+          >
+            Proponha uma ideia
+          </Command.Item>
           {FIGURES.map((figure) => (
             <Command.Item
               key={figure.slug}
@@ -118,6 +130,17 @@ export function CommandPalette({ shortcut }: { shortcut: string }) {
               <span className="font-mono text-xs text-copper">adesivo</span>
               <span className="mt-1 block text-ink">{figure.title}</span>
               <span className="block text-xs text-muted">Animada, na nota aberta</span>
+            </Command.Item>
+          ))}
+          {ideas.map((idea) => (
+            <Command.Item
+              key={`idea-${idea.slug}`}
+              value={`minha figura ${idea.slug} ${idea.title}`}
+              className="rounded-md px-3 py-3 text-sm"
+              onSelect={() => insertFigure(idea.slug)}
+            >
+              <span className="font-mono text-xs text-copper">{idea.slug}</span>
+              <span className="mt-1 block text-ink">{idea.title}</span>
             </Command.Item>
           ))}
         </Command.Group>

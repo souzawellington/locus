@@ -125,6 +125,8 @@ export function Editor() {
   const setConfirm = useVault((state) => state.setConfirm);
   const placeOnCanvas = useVault((state) => state.placeOnCanvas);
   const insertFigure = useVault((state) => state.insertFigure);
+  const setIdeaOpen = useVault((state) => state.setIdeaOpen);
+  const ideas = useVault((state) => state.ideas) ?? [];
   const [figuresOpen, setFiguresOpen] = useState(false);
   const setView = useVault((state) => state.setView);
   const openWiki = useVault((state) => state.openWiki);
@@ -221,6 +223,16 @@ export function Editor() {
         </div>
         {figuresOpen ? (
           <div className="flex flex-wrap gap-2" role="list" aria-label="Figuras">
+            <button
+              type="button"
+              className="h-10 rounded-full bg-copper px-3 text-sm text-paper-2"
+              onClick={() => {
+                setFiguresOpen(false);
+                setIdeaOpen(true);
+              }}
+            >
+              Proponha uma ideia
+            </button>
             {FIGURES.map((figure) => (
               <button
                 key={figure.slug}
@@ -232,6 +244,19 @@ export function Editor() {
                 }}
               >
                 {figure.title}
+              </button>
+            ))}
+            {ideas.map((idea) => (
+              <button
+                key={idea.slug}
+                type="button"
+                className="h-10 rounded-full border border-line px-3 text-sm text-ink"
+                onClick={() => {
+                  insertFigure(idea.slug);
+                  setFiguresOpen(false);
+                }}
+              >
+                {idea.title}
               </button>
             ))}
           </div>

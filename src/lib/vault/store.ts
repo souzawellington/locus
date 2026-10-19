@@ -4,6 +4,8 @@ import { messageId, planTurn, runReadOnly } from "./agent";
 import { formatFigureEmbed, rewriteWikilinks, type FigureMotion, type FigureSize } from "./markdown";
 import { findNote, findNoteLoose } from "./retrieve";
 import { seedCells, seedNotes } from "./seed";
+import type { SavedIdea } from "@/figures/idea/schema";
+import { ideaSlug } from "@/figures/idea/schema";
 import type { BoardSticker, CanvasPos, ChatMessage, ConfirmState, Note, NoteDraft, NotebookCell, WorkspaceView, WriteMode } from "./types";
 
 type Theme = "light" | "dark";
@@ -13,6 +15,8 @@ type FabricJob = { assistantId: string; patternId: string; source: string; start
 type VaultState = {
   notes: Note[];
   stickers: BoardSticker[];
+  ideas: SavedIdea[];
+  ideaOpen: boolean;
   cells: NotebookCell[];
   messages: ChatMessage[];
   activeId: string;
@@ -44,6 +48,10 @@ type VaultState = {
   placeSticker: (sticker: { slug: string; animated?: boolean; tilt?: number }) => void;
   moveSticker: (id: string, x: number, y: number) => void;
   removeSticker: (id: string) => void;
+  setIdeaOpen: (open: boolean) => void;
+  saveIdea: (idea: Omit<SavedIdea, "slug"> & { slug?: string }) => string;
+  renameIdea: (slug: string, title: string, nextSlug: string) => void;
+  deleteIdea: (slug: string) => void;
   updateTitle: (id: string, title: string) => void;
   commitRename: (id: string, from: string, to: string) => void;
   deleteNote: (id: string) => void;
@@ -127,6 +135,8 @@ export const useVault = create<VaultState>()(
     (set, get) => ({
       notes: initialNotes,
       stickers: [],
+      ideas: [],
+      ideaOpen: false,
       cells: seedCells(),
       messages: [],
       activeId: "n-routine",
@@ -216,6 +226,32 @@ export const useVault = create<VaultState>()(
           stickers: (get().stickers ?? []).map((sticker) => (sticker.id === id ? { ...sticker, x, y } : sticker)),
         }),
       removeSticker: (id) => set({ stickers: (get().stickers ?? []).filter((sticker) => sticker.id !== id) }),
+      setIdeaOpen: (ideaOpen) => set({ ideaOpen }),
+      saveIdea: (idea) => {
+        const ideas = get().ideas ?? [];
+        const slug = ideaSlug(idea.slug || idea.name || idea.title, ideas.map((item) => item.slug));
+        const saved: SavedIdea = { ...idea, name: idea.name || idea.title, slug };
+        set({ ideas: [...ideas, saved] });
+        get().insertFigure(slug);
+        return slug;
+      },
+      renameIdea: (slug, title, nextSlug) => {
+        const clean = ideaSlug(nextSlug.replace(/^ideia-/, ""), (get().ideas ?? []).filter((item) => item.slug !== slug).map((item) => item.slug));
+        const target = clean === slug ? slug : clean;
+        set({
+          ideas: (get().ideas ?? []).map((item) => (item.slug === slug ? { ...item, title: title.trim() || item.title, slug: target } : item)),
+          stickers: (get().stickers ?? []).map((sticker) => (sticker.slug === slug ? { ...sticker, slug: target } : sticker)),
+          notes: get().notes.map((note) => ({
+            ...note,
+            body: note.body.replace(new RegExp(`!\\[\\[figure:${slug}(?=[|\\]])`, "g"), `![[figure:${target}`),
+          })),
+        });
+      },
+      deleteIdea: (slug) =>
+        set({
+          ideas: (get().ideas ?? []).filter((item) => item.slug !== slug),
+          stickers: (get().stickers ?? []).filter((sticker) => sticker.slug !== slug),
+        }),
       updateTitle: (id, title) =>
         set({
           notes: get().notes.map((note) => (note.id === id ? { ...note, title } : note)),
@@ -449,6 +485,7 @@ export const useVault = create<VaultState>()(
       partialize: (state) => ({
         notes: state.notes,
         stickers: state.stickers,
+        ideas: state.ideas,
         cells: state.cells,
         messages: state.messages,
         activeId: state.activeId,

@@ -67,6 +67,20 @@ Export stays on this device. From the note or the drawer: SVG, a transparent PNG
 
 ![A sticker dropped on the canvas](docs/assets/stickers-canvas.png)
 
+### Propose an idea
+
+**Proponha uma ideia**, in the figure picker, the Figurinhas drawer, and the command palette, asks for a machine in plain words. The model must answer with the same part list the other figures use: slabs, cylinders, screws, a moving layer, and a lift for taking it apart. The app checks that shape, refuses scripts, event handlers, external links and `foreignObject`, and only then draws it. A bad answer stays unsaved, with a retry.
+
+The feature does nothing until you paste your own key. The key lives in this browser’s `localStorage`, labelled in the settings panel, and it is sent only to the provider you pick: xAI, OpenAI, or another HTTPS endpoint that speaks the OpenAI chat-completions format. There is a button to remove it. No key is shipped with Locus. Anthropic is not offered: its API is not a browser call of that shape. Nothing on the network runs until you press **Gerar**.
+
+A saved figure is `ideia-<nome>`. It takes the same flags as the rest (`|sticker`, `|animated`, `|still`, `|tilt:`), and it can sit in a note, the drawer, or the canvas. **Minhas figuras** renames or deletes it. Deleting it leaves the note line, which then reads as an unknown figure.
+
+![The key stays on this device](docs/assets/idea-settings.png)
+
+![A generated figure, ready to save](docs/assets/idea-flow.png)
+
+![The saved figure inside a note](docs/assets/idea-note.png)
+
 ## Interface
 
 Captured from the running app. The window frame is only for this page.
