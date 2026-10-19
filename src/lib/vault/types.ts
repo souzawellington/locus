@@ -1,5 +1,14 @@
 export type CanvasPos = { x: number; y: number; w: number; h: number };
 
+export type BoardSticker = {
+  id: string;
+  slug: string;
+  x: number;
+  y: number;
+  tilt: number;
+  animated: boolean;
+};
+
 export type Note = {
   id: string;
   title: string;

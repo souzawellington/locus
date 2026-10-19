@@ -24,15 +24,51 @@ const KIND_LABEL: Record<BlockKind, string> = {
   figure: "figura",
 };
 
-const FIGURE_RE = /^!\[\[figure:([a-z0-9-]+)(?:\|(sticker|full))?\]\]$/;
+const FIGURE_RE = /^!\[\[figure:([a-z0-9-]+)((?:\|[a-z0-9:-]+)*)\]\]$/;
 
-export type FigureEmbed = { slug: string; size: "sticker" | "full" };
+export type FigureSize = "sticker" | "full";
+export type FigureMotion = "animated" | "still";
+export type FigureEmbed = { slug: string; size: FigureSize; motion: FigureMotion; tilt: number };
 
 export function parseFigureEmbed(raw: string): FigureEmbed | null {
   const match = FIGURE_RE.exec(raw.trim());
   const slug = match?.[1];
   if (!slug) return null;
-  return { slug, size: match?.[2] === "sticker" ? "sticker" : "full" };
+  const tokens = (match[2] ?? "").split("|").filter(Boolean);
+  let size: FigureSize = "full";
+  let motion: FigureMotion | null = null;
+  let tilt = 0;
+  for (const token of tokens) {
+    if (token === "sticker" || token === "full") {
+      size = token;
+      continue;
+    }
+    if (token === "animated" || token === "still") {
+      if (motion && motion !== token) return null;
+      motion = token;
+      continue;
+    }
+    if (token.startsWith("tilt:")) {
+      const value = Number(token.slice(5));
+      if (!Number.isInteger(value) || value < -12 || value > 12) return null;
+      tilt = value;
+      continue;
+    }
+    return null;
+  }
+  return { slug, size, motion: motion ?? (size === "sticker" ? "still" : "animated"), tilt };
+}
+
+export function formatFigureEmbed(options: { slug: string; size?: FigureSize; motion?: FigureMotion; tilt?: number }): string {
+  const size = options.size ?? "full";
+  const motion = options.motion ?? (size === "sticker" ? "still" : "animated");
+  const tilt = options.tilt ?? 0;
+  const tokens = [options.slug];
+  if (size === "sticker") tokens.push("sticker");
+  if (size === "sticker" && motion === "animated") tokens.push("animated");
+  if (size === "full" && motion === "still") tokens.push("still");
+  if (tilt !== 0) tokens.push(`tilt:${tilt}`);
+  return `![[figure:${tokens.join("|")}]]`;
 }
 
 export function kindLabel(kind: BlockKind): string {
@@ -255,7 +291,7 @@ export function rewriteWikilinks(markdown: string, from: string, to: string): st
 export function plainText(markdown: string): string {
   return markdown
     .replace(/```[\s\S]*?```/g, " ")
-    .replace(/!\[\[figure:[a-z0-9-]+(?:\|(?:sticker|full))?\]\]/g, " ")
+    .replace(/!\[\[figure:[a-z0-9-]+(?:\|[a-z0-9:-]+)*\]\]/g, " ")
     .replace(/\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|([^\]]+))?\]\]/g, (_, title: string, label?: string) => label?.trim() || title.trim())
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1")
     .replace(/[*_`>#-]/g, " ")

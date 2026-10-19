@@ -1,5 +1,6 @@
 import { Minus, Plus, Scan } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { FigureHost } from "@/figures/FigureHost";
 import { plainText, wikilinkTitles } from "@/lib/vault/markdown";
 import { findNote } from "@/lib/vault/retrieve";
 import { useVault } from "@/lib/vault/store";
@@ -11,6 +12,9 @@ export function CanvasBoard() {
   const moveCanvas = useVault((state) => state.moveCanvas);
   const select = useVault((state) => state.select);
   const placeOnCanvas = useVault((state) => state.placeOnCanvas);
+  const stickers = useVault((state) => state.stickers);
+  const moveSticker = useVault((state) => state.moveSticker);
+  const removeSticker = useVault((state) => state.removeSticker);
   const boardRef = useRef<HTMLDivElement>(null);
   const [pan, setPan] = useState({ x: 40, y: 40 });
   const [scale, setScale] = useState(1);
@@ -39,9 +43,17 @@ export function CanvasBoard() {
 
   function fit() {
     const element = boardRef.current;
-    if (!element || !placed.length) return;
-    const xs = placed.flatMap((note) => (note.canvas ? [note.canvas.x, note.canvas.x + note.canvas.w] : []));
-    const ys = placed.flatMap((note) => (note.canvas ? [note.canvas.y, note.canvas.y + note.canvas.h] : []));
+    if (!element || (!placed.length && !stickers.length)) return;
+    const xs = [
+      ...placed.flatMap((note) => (note.canvas ? [note.canvas.x, note.canvas.x + note.canvas.w] : [])),
+      ...stickers.map((sticker) => sticker.x),
+      ...stickers.map((sticker) => sticker.x + 180),
+    ];
+    const ys = [
+      ...placed.flatMap((note) => (note.canvas ? [note.canvas.y, note.canvas.y + note.canvas.h] : [])),
+      ...stickers.map((sticker) => sticker.y),
+      ...stickers.map((sticker) => sticker.y + 150),
+    ];
     const minX = Math.min(...xs);
     const maxX = Math.max(...xs);
     const minY = Math.min(...ys);
@@ -71,7 +83,7 @@ export function CanvasBoard() {
     return () => observer.disconnect();
     // Refit when the set of cards changes or the board is resized.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placed.map((note) => note.id).join("|")]);
+  }, [placed.map((note) => note.id).join("|"), stickers.map((sticker) => sticker.id).join("|")]);
 
   useEffect(() => {
     const element = boardRef.current;
@@ -154,6 +166,47 @@ export function CanvasBoard() {
               <line key={edge.key} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} stroke="var(--copper)" strokeOpacity="0.55" strokeWidth="1.5" />
             ))}
           </svg>
+          {stickers.map((sticker) => (
+            <div
+              key={sticker.id}
+              className="absolute z-10"
+              style={{ left: sticker.x, top: sticker.y, width: 180 }}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                const startX = event.clientX;
+                const startY = event.clientY;
+                const origin = { x: sticker.x, y: sticker.y };
+                const move = (pointer: PointerEvent) => {
+                  moveSticker(sticker.id, origin.x + (pointer.clientX - startX) / scale, origin.y + (pointer.clientY - startY) / scale);
+                };
+                const up = () => {
+                  window.removeEventListener("pointermove", move);
+                  window.removeEventListener("pointerup", up);
+                };
+                window.addEventListener("pointermove", move);
+                window.addEventListener("pointerup", up);
+              }}
+            >
+              <FigureHost
+                embed={{
+                  slug: sticker.slug,
+                  size: "sticker",
+                  motion: sticker.animated ? "animated" : "still",
+                  tilt: sticker.tilt,
+                }}
+                showExport={false}
+              />
+              <button
+                type="button"
+                aria-label="Tirar figurinha"
+                className="absolute -top-2 -right-2 grid size-7 place-items-center rounded-full border border-line bg-paper text-xs text-muted"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={() => removeSticker(sticker.id)}
+              >
+                ×
+              </button>
+            </div>
+          ))}
           {placed.map((note) =>
             note.canvas ? (
               <article
@@ -179,7 +232,7 @@ export function CanvasBoard() {
             ) : null,
           )}
         </div>
-        {placed.length === 0 ? (
+        {placed.length === 0 && stickers.length === 0 ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
             <p className="text-muted">Nenhuma nota no plano.</p>
             <button type="button" className="h-11 rounded-md bg-copper px-4 text-sm text-paper-2" onClick={() => activeId && placeOnCanvas(activeId)} disabled={!activeId}>
