@@ -2,6 +2,9 @@
 
 A local vault for linked notes. The text stays in the browser.
 
+[![Live demo](https://img.shields.io/badge/Live_demo-open-9C4520?style=flat-square)](https://locus-brown-delta.vercel.app)
+[![Vercel](https://img.shields.io/badge/Vercel-deployed-1A1714?style=flat-square&logo=vercel&logoColor=F3EFE6)](https://locus-brown-delta.vercel.app)
+
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-1A1714?style=flat-square)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-9C4520?style=flat-square)](https://react.dev/)
 [![TanStack Start](https://img.shields.io/badge/TanStack_Start-1-6D655C?style=flat-square)](https://tanstack.com/start)
@@ -73,7 +76,9 @@ Atlas can call the xAI API when `XAI_API_KEY` is set. Without that key, pattern 
 
 ## Getting started
 
-Node.js 22.
+The live app is at [locus-brown-delta.vercel.app](https://locus-brown-delta.vercel.app). Every push to `main` redeploys it.
+
+To run a copy locally, Node.js 22.
 
 ```bash
 npm install
