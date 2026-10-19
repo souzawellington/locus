@@ -1,3 +1,4 @@
+import { formatPlace } from "../maps/place.ts";
 import type { NotebookCell, Note } from "./types";
 
 const minute = 60_000;
@@ -11,6 +12,52 @@ function at(age: number): { createdAt: number; updatedAt: number } {
 
 export function seedNotes(): Note[] {
   return [
+    {
+      id: "n-birthday",
+      title: "Aniversário da Ana",
+      ...at(10_000),
+      body: `Sábado, às 15h. Tem bolo, suco e um canto na sala para os casacos.
+
+Quem vem de carro, de bicicleta ou a pé toca em Como chegar.
+
+${formatPlace({
+  name: "Casa da Ana",
+  address: "Rua Harmonia, 123 — Pinheiros, São Paulo",
+  lat: -23.5567645,
+  lon: -46.6870128,
+  mode: "car",
+})}`,
+    },
+    {
+      id: "n-tables",
+      title: "Mesas do mês",
+      ...at(20_000),
+      body: `Três mesas para escolher. O mapa junta os três endereços.
+
+${formatPlace({
+  name: "Bar da Dona Onça",
+  address: "Avenida Ipiranga, 200 — Vila Buarque, São Paulo",
+  lat: -23.5465557,
+  lon: -46.6448479,
+  mode: "walk",
+})}
+
+${formatPlace({
+  name: "A Casa do Porco",
+  address: "Rua Araújo, 124 — Vila Buarque, São Paulo",
+  lat: -23.5448651,
+  lon: -46.6447012,
+  mode: "walk",
+})}
+
+${formatPlace({
+  name: "Maní",
+  address: "Rua Joaquim Antunes, 210 — Jardim Paulista, São Paulo",
+  lat: -23.5663802,
+  lon: -46.6797289,
+  mode: "car",
+})}`,
+    },
     {
       id: "n-recipe",
       title: "Bolo de laranja",

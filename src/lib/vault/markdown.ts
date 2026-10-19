@@ -1,4 +1,4 @@
-export type BlockKind = "heading" | "paragraph" | "list" | "quote" | "code" | "rule" | "figure" | "media";
+export type BlockKind = "heading" | "paragraph" | "list" | "quote" | "code" | "rule" | "figure" | "media" | "place";
 
 export type MdBlock = {
   id: string;
@@ -23,7 +23,14 @@ const KIND_LABEL: Record<BlockKind, string> = {
   rule: "divisor",
   figure: "figura",
   media: "mídia",
+  place: "mapa",
 };
+
+const PLACE_LINE = /^!\[\[place:-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)\|(?:car|bike|walk)\|[^|\]]*\|[^\]]*\]\]$/;
+
+export function isPlaceLine(raw: string): boolean {
+  return PLACE_LINE.test(raw.trim());
+}
 
 const MEDIA_RE = /^!\[\[media:([a-z0-9-]+)(?:\|([^\]]*))?\]\]$/;
 
@@ -105,6 +112,7 @@ function kindOf(raw: string): BlockKind {
   const trimmed = raw.trim();
   if (parseFigureEmbed(trimmed)) return "figure";
   if (parseMediaEmbed(trimmed)) return "media";
+  if (isPlaceLine(trimmed)) return "place";
   if (trimmed.startsWith("```")) return "code";
   if (/^(-{3,}|\*{3,})$/.test(trimmed)) return "rule";
   if (/^#{1,3}\s/.test(trimmed)) return "heading";
@@ -145,7 +153,7 @@ export function parseBlocks(markdown: string): MdBlock[] {
       flush();
       continue;
     }
-    if (parseFigureEmbed(line) || parseMediaEmbed(line)) {
+    if (parseFigureEmbed(line) || parseMediaEmbed(line) || isPlaceLine(line)) {
       flush();
       chunks.push(line);
       continue;
@@ -320,6 +328,7 @@ export function plainText(markdown: string): string {
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/!\[\[figure:[a-z0-9-]+(?:\|[a-z0-9:-]+)*\]\]/g, " ")
     .replace(/!\[\[media:[a-z0-9-]+(?:\|[^\]]*)?\]\]/g, " ")
+    .replace(/!\[\[place:-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)\|(?:car|bike|walk)\|[^|\]]*\|[^\]]*\]\]/g, " ")
     .replace(/\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|([^\]]+))?\]\]/g, (_, title: string, label?: string) => label?.trim() || title.trim())
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1")
     .replace(/[*_`>#-]/g, " ")

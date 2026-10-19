@@ -20,11 +20,11 @@ The interface is in Portuguese.
 
 ## Em português
 
-Locus é um cofre de notas que mora no navegador. Você escreve como num bloco de notas: `/` abre o menu de blocos e `@` liga outra nota pelo nome. As mesmas notas vão para o canvas, para um caderno que executa pela dependência e para o Atlas. A resposta aponta o trecho de onde veio. Sem conta e sem nuvem: o texto fica neste dispositivo, e exportar é um arquivo que você baixa de propósito.
+Locus é um cofre de notas que mora no navegador. Você escreve como num bloco de notas: `/` abre o menu de blocos e `@` liga outra nota pelo nome. Um endereço vira mapa só quando você pede, com o caminho e os links para abrir em outro aplicativo. As mesmas notas vão para o canvas, para um caderno que executa pela dependência e para o Atlas. A resposta aponta o trecho de onde veio. Sem conta e sem nuvem: o texto fica neste dispositivo, e a rede só é chamada quando você cria ou abre um mapa. Exportar é um arquivo que você baixa de propósito.
 
 ## Features
 
-- **Notes.** The visual editor is the default. Type `/` for a block (figure, sticker, photo, camera, video, note link, heading, list, checklist, quote, divider, code) or tap **+**. Type `@` to link a note by name. A reading view sits beside the note.
+- **Notes.** The visual editor is the default. Type `/` for a block (figure, sticker, photo, camera, video, map, note link, heading, list, checklist, quote, divider, code) or tap **+**. Type `@` to link a note by name. A reading view sits beside the note.
 - **Photos and video.** Gallery, in-app camera, a short clip, drag-and-drop and paste. Images are resized on the device and kept in IndexedDB. Nothing is uploaded.
 - **Private notes.** **Trancar nota** encrypts the note on the device (PBKDF2 and AES-GCM). The list shows a padlock and the title, or hides the title. A forgotten password cannot be recovered. Unlock lasts for the session, then locks again after inactivity, or with **Trancar agora**.
 - **Canvas.** Each card is a whole note. Moving it does not copy the text. Lines follow the links between notes. A locked note does not preview its text.
@@ -33,6 +33,15 @@ Locus é um cofre de notas que mora no navegador. Você escreve como num bloco d
 - **Atlas.** Local retrieval over the vault (n-gram vectors and BM25) with citations. Pattern tools such as `extract_wisdom` preview a note and write only after you approve. Locked notes stay out of search until they are open.
 - **On this device.** Search, theme, focus mode, and the command palette (`Ctrl+K` or `⌘K`). New note is `Ctrl+N`. **Ajustes** holds **Ver código** for the file view, off by default, and an optional device PIN.
 - **Figures.** A note can hold an interactive instrument. Insert it from `/` or **+**, as a full figure or a sticker.
+- **Maps.** **Mapa** in the `/` menu searches a place and drops a pin. A line that looks like an address can offer **Mostrar no mapa**, and nothing is looked up until you tap. **Como chegar** draws a walk, bike, or car route. Google Maps, Waze, and Apple Maps open as ordinary links. Tiles come from OpenFreeMap (OpenStreetMap data) and need no key. The public routing demo is used only when you ask for a route; an OpenRouteService key in **Ajustes** is optional and stays on the device. A locked note does not load a map until it is unlocked. The network is called only when you create or open a map.
+
+![A birthday note with a route](docs/assets/birthday-route.png)
+
+![Place search](docs/assets/place-search.png)
+
+![Several restaurants on one map](docs/assets/restaurants.png)
+
+![The same invite on a phone](docs/assets/birthday-route-mobile.png)
 
 ![The block menu](docs/assets/slash-menu.png)
 
