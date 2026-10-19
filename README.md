@@ -30,6 +30,28 @@ Locus é um cofre de notas que mora no navegador. Você escreve em markdown, lig
 - **Graph.** Wikilinks drawn as a graph. Drag a node to pin it.
 - **Atlas.** Local retrieval over the vault (n-gram vectors and BM25) with citations. Pattern tools such as `extract_wisdom` preview a note and write only after you approve.
 - **On this device.** Search, theme, focus mode, and the command palette (`Ctrl+K` or `⌘K`). New note is `Ctrl+N`.
+- **Figures.** A note can hold an interactive instrument. The syntax is `![[figure:wikilinks]]`, or `![[figure:embeddings|sticker]]` for a small card.
+
+## Figures
+
+A figure is a small machine whose working is the idea: a patch bay for wikilinks, a composing stick for a merge, a press that waits for approval. Hover or the arrow keys move it. `A` takes it apart, where the machine comes apart. An unknown slug stays in the note and says so. Nothing is fetched.
+
+Insert one with the **Figura** button, or from the command palette. The sample note **Figuras do cofre** holds the pack. **Edição em blocos** carries a sticker.
+
+The drawings are [Anatomy](https://github.com/wheresryan22/anatomy) figures (MIT, Ryan), vendored at `.agents/skills/anatomy` with that license. This pack is SVG only, in the light Locus palette. WebGL and the 3D turn mode are not used. Generated example HTML and PDFs are left out; `node examples/<name>/build.mjs` in that folder rebuilds them.
+
+| Slug | Machine |
+| --- | --- |
+| `wikilinks` | Patch bay. One cord, two lamps. |
+| `crdt` | Composing stick. Two slugs, no referee. |
+| `embeddings` | Comparator. The score stays on the bench. |
+| `notebook` | Balance train. Order follows dependency. |
+| `atlas` | Fiche reader. The finger lands on a real line. |
+| `canvas` | Drafting board. A card moves, the sheet does not copy. |
+| `approval` | Press. The platen waits for the lever. |
+| `local-vault` | Desk safe. Export is the slip drawer. |
+
+![A figure inside a note](docs/assets/figures.png)
 
 ## Interface
 

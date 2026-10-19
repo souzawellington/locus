@@ -1,4 +1,4 @@
-export type BlockKind = "heading" | "paragraph" | "list" | "quote" | "code" | "rule";
+export type BlockKind = "heading" | "paragraph" | "list" | "quote" | "code" | "rule" | "figure";
 
 export type MdBlock = {
   id: string;
@@ -21,7 +21,19 @@ const KIND_LABEL: Record<BlockKind, string> = {
   quote: "citação",
   code: "código",
   rule: "divisor",
+  figure: "figura",
 };
+
+const FIGURE_RE = /^!\[\[figure:([a-z0-9-]+)(?:\|(sticker|full))?\]\]$/;
+
+export type FigureEmbed = { slug: string; size: "sticker" | "full" };
+
+export function parseFigureEmbed(raw: string): FigureEmbed | null {
+  const match = FIGURE_RE.exec(raw.trim());
+  const slug = match?.[1];
+  if (!slug) return null;
+  return { slug, size: match?.[2] === "sticker" ? "sticker" : "full" };
+}
 
 export function kindLabel(kind: BlockKind): string {
   return KIND_LABEL[kind];
@@ -29,6 +41,7 @@ export function kindLabel(kind: BlockKind): string {
 
 function kindOf(raw: string): BlockKind {
   const trimmed = raw.trim();
+  if (parseFigureEmbed(trimmed)) return "figure";
   if (trimmed.startsWith("```")) return "code";
   if (/^(-{3,}|\*{3,})$/.test(trimmed)) return "rule";
   if (/^#{1,3}\s/.test(trimmed)) return "heading";
@@ -67,6 +80,11 @@ export function parseBlocks(markdown: string): MdBlock[] {
     }
     if (line.trim() === "") {
       flush();
+      continue;
+    }
+    if (parseFigureEmbed(line)) {
+      flush();
+      chunks.push(line);
       continue;
     }
     buffer.push(line);
@@ -150,6 +168,14 @@ export function parseInline(input: string): InlineNode[] {
   };
 
   while (index < input.length) {
+    if (input.startsWith("![[", index)) {
+      const end = input.indexOf("]]", index + 3);
+      if (end !== -1 && parseFigureEmbed(input.slice(index, end + 2))) {
+        text += input.slice(index, end + 2);
+        index = end + 2;
+        continue;
+      }
+    }
     if (input.startsWith("**", index)) {
       const end = input.indexOf("**", index + 2);
       if (end !== -1) {
@@ -208,7 +234,7 @@ export function parseInline(input: string): InlineNode[] {
 
 export function wikilinkTitles(markdown: string): string[] {
   const found: string[] = [];
-  const re = /\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|[^\]]+)?\]\]/g;
+  const re = /(?<!!)\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|[^\]]+)?\]\]/g;
   let match: RegExpExecArray | null;
   while ((match = re.exec(markdown))) {
     const title = match[1]?.trim();
@@ -220,7 +246,7 @@ export function wikilinkTitles(markdown: string): string[] {
 export function rewriteWikilinks(markdown: string, from: string, to: string): string {
   const source = from.trim().toLowerCase();
   if (!source || source === to.trim().toLowerCase()) return markdown;
-  return markdown.replace(/\[\[([^\]|#]+)(#[^\]|]+)?(\|[^\]]+)?\]\]/g, (full, title: string, hash = "", alias = "") => {
+  return markdown.replace(/(?<!!)\[\[([^\]|#]+)(#[^\]|]+)?(\|[^\]]+)?\]\]/g, (full, title: string, hash = "", alias = "") => {
     if (title.trim().toLowerCase() !== source) return full;
     return `[[${to}${hash}${alias}]]`;
   });
@@ -229,6 +255,7 @@ export function rewriteWikilinks(markdown: string, from: string, to: string): st
 export function plainText(markdown: string): string {
   return markdown
     .replace(/```[\s\S]*?```/g, " ")
+    .replace(/!\[\[figure:[a-z0-9-]+(?:\|(?:sticker|full))?\]\]/g, " ")
     .replace(/\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|([^\]]+))?\]\]/g, (_, title: string, label?: string) => label?.trim() || title.trim())
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1")
     .replace(/[*_`>#-]/g, " ")

@@ -12,6 +12,33 @@ function at(age: number): { createdAt: number; updatedAt: number } {
 export function seedNotes(): Note[] {
   return [
     {
+      id: "n-figures",
+      title: "Figuras do cofre",
+      ...at(2 * minute),
+      canvas: { x: 1040, y: 520, w: 280, h: 160 },
+      body: `Cada figura é uma máquina pequena. O mecanismo é o conceito: o cabo é a ligação, o componedor é a fusão, a prensa espera o sim. Passe o cursor ou use as setas. A desmonta, quando a peça se separa.
+
+![[figure:wikilinks]]
+
+![[figure:crdt]]
+
+![[figure:embeddings|sticker]]
+
+![[figure:notebook]]
+
+![[figure:atlas]]
+
+![[figure:canvas]]
+
+![[figure:approval]]
+
+![[figure:local-vault]]
+
+Uma figura que não existe fica no lugar, sem inventar desenho.
+
+![[figure:nao-existe]]`,
+    },
+    {
       id: "n-routine",
       title: "Rotina de investigação",
       ...at(8 * minute),
@@ -46,7 +73,9 @@ A base clássica dessa ideia guarda um modelo transacional do documento, com his
 
 Reordenar não é enfeite. Quando a unidade de edição é o bloco, mover um argumento para cima muda a estrutura sem corromper o resto. A busca e o Atlas indexam esses mesmos blocos, então a unidade de escrita e a unidade de recuperação coincidem.
 
-Veja também [[Sincronização local-first]] e [[Canvas espacial]].`,
+Veja também [[Sincronização local-first]] e [[Canvas espacial]].
+
+![[figure:wikilinks|sticker]]`,
     },
     {
       id: "n-canvas",

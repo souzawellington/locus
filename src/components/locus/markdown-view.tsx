@@ -1,9 +1,11 @@
+import { FigureHost } from "@/figures/FigureHost";
 import {
   codeParts,
   headingLevel,
   headingText,
   listItems,
   parseBlocks,
+  parseFigureEmbed,
   parseInline,
   quoteText,
   type InlineNode,
@@ -55,6 +57,11 @@ function Inline({ nodes, onWiki }: { nodes: InlineNode[]; onWiki: (title: string
 }
 
 function BlockView({ block, onWiki }: { block: MdBlock; onWiki: (title: string) => void }) {
+  if (block.kind === "figure") {
+    const embed = parseFigureEmbed(block.raw);
+    if (!embed) return null;
+    return <FigureHost embed={embed} />;
+  }
   if (block.kind === "rule") return <hr className="border-line" />;
   if (block.kind === "heading") {
     const level = headingLevel(block.raw);
