@@ -1,4 +1,4 @@
-export type BlockKind = "heading" | "paragraph" | "list" | "quote" | "code" | "rule" | "figure";
+export type BlockKind = "heading" | "paragraph" | "list" | "quote" | "code" | "rule" | "figure" | "media";
 
 export type MdBlock = {
   id: string;
@@ -22,7 +22,33 @@ const KIND_LABEL: Record<BlockKind, string> = {
   code: "código",
   rule: "divisor",
   figure: "figura",
+  media: "mídia",
 };
+
+const MEDIA_RE = /^!\[\[media:([a-z0-9-]+)(?:\|([^\]]*))?\]\]$/;
+
+export type MediaEmbed = { id: string; caption: string };
+
+export function parseMediaEmbed(raw: string): MediaEmbed | null {
+  const match = MEDIA_RE.exec(raw.trim());
+  const id = match?.[1];
+  if (!id) return null;
+  return { id, caption: (match?.[2] ?? "").trim() };
+}
+
+export function formatMediaEmbed(id: string, caption = ""): string {
+  return caption ? `![[media:${id}|${caption.replace(/[\]\n]/g, " ")}]]` : `![[media:${id}]]`;
+}
+
+export function mediaIds(markdown: string): string[] {
+  const found: string[] = [];
+  const re = /!\[\[media:([a-z0-9-]+)(?:\|[^\]]*)?\]\]/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(markdown))) {
+    if (match[1]) found.push(match[1]);
+  }
+  return [...new Set(found)];
+}
 
 const FIGURE_RE = /^!\[\[figure:([a-z0-9-]+)((?:\|[a-z0-9:-]+)*)\]\]$/;
 
@@ -78,6 +104,7 @@ export function kindLabel(kind: BlockKind): string {
 function kindOf(raw: string): BlockKind {
   const trimmed = raw.trim();
   if (parseFigureEmbed(trimmed)) return "figure";
+  if (parseMediaEmbed(trimmed)) return "media";
   if (trimmed.startsWith("```")) return "code";
   if (/^(-{3,}|\*{3,})$/.test(trimmed)) return "rule";
   if (/^#{1,3}\s/.test(trimmed)) return "heading";
@@ -118,7 +145,7 @@ export function parseBlocks(markdown: string): MdBlock[] {
       flush();
       continue;
     }
-    if (parseFigureEmbed(line)) {
+    if (parseFigureEmbed(line) || parseMediaEmbed(line)) {
       flush();
       chunks.push(line);
       continue;
@@ -292,6 +319,7 @@ export function plainText(markdown: string): string {
   return markdown
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/!\[\[figure:[a-z0-9-]+(?:\|[a-z0-9:-]+)*\]\]/g, " ")
+    .replace(/!\[\[media:[a-z0-9-]+(?:\|[^\]]*)?\]\]/g, " ")
     .replace(/\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|([^\]]+))?\]\]/g, (_, title: string, label?: string) => label?.trim() || title.trim())
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1")
     .replace(/[*_`>#-]/g, " ")

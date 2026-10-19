@@ -1,5 +1,5 @@
-import { parseBlocks, plainText } from "./markdown";
-import type { Citation, Note } from "./types";
+import { parseBlocks, plainText } from "./markdown.ts";
+import type { Citation, Note, OpenNote } from "./types";
 
 const DIM = 64;
 
@@ -237,6 +237,15 @@ export function findNoteLoose(notes: Note[], query: string): Note | undefined {
   const includes = notes.filter((note) => fold(note.title).includes(needle));
   if (includes.length === 1) return includes[0];
   return undefined;
+}
+
+export function presentNotes(notes: Note[], openNotes: Record<string, OpenNote>): Note[] {
+  return notes.map((note) => {
+    const open = openNotes[note.id];
+    if (open) return { ...note, title: open.title, body: open.body };
+    if (note.seal) return { ...note, body: "" };
+    return note;
+  });
 }
 
 export function searchNotes(notes: Note[], query: string): Note[] {

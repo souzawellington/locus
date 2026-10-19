@@ -1,5 +1,6 @@
-import { FileText, Frame, Library, Moon, PanelLeft, Sigma, Sun, Waypoints, X } from "lucide-react";
+import { FileText, Frame, Library, Moon, PanelLeft, Settings, Sigma, Sun, Waypoints, X } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
+import { idleExpired, lastActiveAt, markActive } from "@/lib/vault/seal";
 import { useVault } from "@/lib/vault/store";
 import type { WorkspaceView } from "@/lib/vault/types";
 import { cn } from "@/lib/utils";
@@ -10,6 +11,7 @@ import { ProposeIdea } from "./propose-idea";
 import { StickerDrawer } from "./sticker-drawer";
 import { Editor } from "./editor";
 import { GraphView } from "./graph-view";
+import { SettingsSheet } from "./settings-sheet";
 import { Sidebar } from "./sidebar";
 
 const NotebookView = lazy(() => import("./notebook-view").then((mod) => ({ default: mod.NotebookView })));
@@ -45,6 +47,9 @@ export function LocusApp() {
   const shortcut = shortcutLabel();
   const [hold, setHold] = useState(true);
   const [stickersOpen, setStickersOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const openCount = useVault((state) => Object.keys(state.openNotes).length);
+  const unlockAllNow = useVault((state) => state.unlockAllNow);
   const ideaOpen = useVault((state) => state.ideaOpen);
   const setIdeaOpen = useVault((state) => state.setIdeaOpen);
 
@@ -65,6 +70,21 @@ export function LocusApp() {
     return () => {
       live = false;
       window.clearTimeout(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    const bump = () => markActive();
+    window.addEventListener("pointerdown", bump, { passive: true });
+    window.addEventListener("keydown", bump);
+    const timer = window.setInterval(() => {
+      const state = useVault.getState();
+      if (Object.keys(state.openNotes).length > 0 && idleExpired(lastActiveAt(), Date.now())) state.unlockAllNow();
+    }, 5000);
+    return () => {
+      window.removeEventListener("pointerdown", bump);
+      window.removeEventListener("keydown", bump);
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -138,7 +158,7 @@ export function LocusApp() {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-paper text-ink">
-      <header className={cn("flex items-center gap-2 border-b border-line px-2 py-1 md:px-3", focusMode ? "" : "md:py-2")}>
+      <header className={cn("flex items-center gap-2 overflow-x-auto border-b border-line px-2 py-1 md:px-3", focusMode ? "" : "md:py-2")}>
         {focusMode ? null : (
           <button
             type="button"
@@ -181,6 +201,14 @@ export function LocusApp() {
                 );
               })}
         </nav>
+        {openCount > 0 ? (
+          <button type="button" onClick={() => unlockAllNow()} className="h-10 rounded-md px-3 text-sm text-ink">
+            Trancar agora
+          </button>
+        ) : null}
+        <button type="button" aria-label="Ajustes" onClick={() => setSettingsOpen(true)} className="grid size-11 place-items-center rounded-md">
+          <Settings className="size-5" />
+        </button>
         <button type="button" aria-label="Alternar tema" onClick={toggleTheme} className="grid size-11 place-items-center rounded-md">
           {theme === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
         </button>
@@ -274,6 +302,7 @@ export function LocusApp() {
           </div>
         </div>
       ) : null}
+      <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

@@ -13,7 +13,7 @@
     "build:dev": "node scripts/with-app-env.mjs vite build --mode development",
     "preview": "node scripts/with-app-env.mjs vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "node --test scripts/migration-plan.test.mjs scripts/sign-out-plan.test.mjs scripts/with-app-env.test.mjs && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts src/lib/preview-path-prefix.test.ts src/lib/vault/markdown.figure.test.ts src/figures/geometry/machines.test.ts src/figures/motion.test.ts src/figures/idea/schema.test.ts src/figures/idea/provider.test.ts",
+    "test": "node --test scripts/migration-plan.test.mjs scripts/sign-out-plan.test.mjs scripts/with-app-env.test.mjs && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts src/lib/preview-path-prefix.test.ts src/lib/vault/markdown.figure.test.ts src/figures/geometry/machines.test.ts src/figures/motion.test.ts src/figures/idea/schema.test.ts src/figures/idea/provider.test.ts src/lib/vault/seal.test.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

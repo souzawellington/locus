@@ -12,7 +12,7 @@ A local vault for linked notes. The text stays in the browser.
 
 ## Overview
 
-Locus is a writing desk for one device. Notes are markdown. `[[wikilinks]]` connect them. The same notes can sit on a canvas, feed a small reactive notebook, or answer a question in Atlas with the passage they came from.
+Locus is a writing desk for one device. You write a note, type `/` for a block and `@` for another note, and the same notes can sit on a canvas, feed a small reactive notebook, or answer a question in Atlas with the passage they came from.
 
 There is no account. The vault is stored in the browser. Export is a markdown file you download on purpose.
 
@@ -20,23 +20,37 @@ The interface is in Portuguese.
 
 ## Em português
 
-Locus é um cofre de notas que mora no navegador. Você escreve em markdown, liga as notas com `[[wikilinks]]`, espalha as mesmas notas num canvas, roda um caderno que executa pela dependência e pergunta ao Atlas. A resposta aponta o trecho de onde veio. Sem conta e sem nuvem: o texto fica neste dispositivo, e exportar é um arquivo markdown.
+Locus é um cofre de notas que mora no navegador. Você escreve como num bloco de notas: `/` abre o menu de blocos e `@` liga outra nota pelo nome. As mesmas notas vão para o canvas, para um caderno que executa pela dependência e para o Atlas. A resposta aponta o trecho de onde veio. Sem conta e sem nuvem: o texto fica neste dispositivo, e exportar é um arquivo que você baixa de propósito.
 
 ## Features
 
-- **Notes.** Source, block, and reading modes. Blocks can be reordered. Wikilinks open the matching note.
-- **Canvas.** Each card is a whole note. Moving it does not copy the text. Lines follow the same `[[wikilinks]]`.
+- **Notes.** The visual editor is the default. Type `/` for a block (figure, sticker, photo, camera, video, note link, heading, list, checklist, quote, divider, code) or tap **+**. Type `@` to link a note by name. A reading view sits beside the note.
+- **Photos and video.** Gallery, in-app camera, a short clip, drag-and-drop and paste. Images are resized on the device and kept in IndexedDB. Nothing is uploaded.
+- **Private notes.** **Trancar nota** encrypts the note on the device (PBKDF2 and AES-GCM). The list shows a padlock and the title, or hides the title. A forgotten password cannot be recovered. Unlock lasts for the session, then locks again after inactivity, or with **Trancar agora**.
+- **Canvas.** Each card is a whole note. Moving it does not copy the text. Lines follow the links between notes. A locked note does not preview its text.
 - **Notebook.** A small interpreter (`mean`, `std`, `chart`, and the rest) runs cells by dependency, not by screen order.
-- **Graph.** Wikilinks drawn as a graph. Drag a node to pin it.
-- **Atlas.** Local retrieval over the vault (n-gram vectors and BM25) with citations. Pattern tools such as `extract_wisdom` preview a note and write only after you approve.
-- **On this device.** Search, theme, focus mode, and the command palette (`Ctrl+K` or `⌘K`). New note is `Ctrl+N`.
-- **Figures.** A note can hold an interactive instrument. The syntax is `![[figure:wikilinks]]`, or `![[figure:embeddings|sticker]]` for a small card.
+- **Graph.** Note links drawn as a graph. Drag a node to pin it.
+- **Atlas.** Local retrieval over the vault (n-gram vectors and BM25) with citations. Pattern tools such as `extract_wisdom` preview a note and write only after you approve. Locked notes stay out of search until they are open.
+- **On this device.** Search, theme, focus mode, and the command palette (`Ctrl+K` or `⌘K`). New note is `Ctrl+N`. **Ajustes** holds **Ver código** for the file view, off by default, and an optional device PIN.
+- **Figures.** A note can hold an interactive instrument. Insert it from `/` or **+**, as a full figure or a sticker.
+
+![The block menu](docs/assets/slash-menu.png)
+
+![A figure and its toolbar](docs/assets/figure-toolbar.png)
+
+![A note linked by name](docs/assets/note-chip.png)
+
+![A locked note](docs/assets/lock-screen.png)
+
+![A recipe with a photo](docs/assets/recipe-photo.png)
+
+![The block menu on a phone](docs/assets/slash-menu-mobile.png)
 
 ## Figures
 
-A figure is a small machine whose working is the idea: a patch bay for wikilinks, a composing stick for a merge, a press that waits for approval. Hover or the arrow keys move it. `A` takes it apart, where the machine comes apart. An unknown slug stays in the note and says so. Nothing is fetched.
+A figure is a small machine whose working is the idea: a patch bay for linked notes, a composing stick for a merge, a press that waits for approval. Hover or the arrow keys move it. Tap the figure for a small toolbar: full size or sticker, animation on or off, a rotation slider, take apart, export, remove. An unknown figure stays in the note and says so. Nothing is fetched.
 
-Insert one with the **Figura** button, or from the command palette. The sample note **Figuras do cofre** holds the pack. **Edição em blocos** carries a sticker.
+Insert one with `/` or **+**, or from the command palette. The sample note **Figuras do cofre** holds the pack. **Edição em blocos** carries a sticker. **Bolo de laranja** is the photo example.
 
 The drawings are [Anatomy](https://github.com/wheresryan22/anatomy) figures (MIT, Ryan), vendored at `.agents/skills/anatomy` with that license. This pack is SVG only, in the light Locus palette. WebGL and the 3D turn mode are not used. Generated example HTML and PDFs are left out; `node examples/<name>/build.mjs` in that folder rebuilds them.
 
@@ -57,7 +71,7 @@ The drawings are [Anatomy](https://github.com/wheresryan22/anatomy) figures (MIT
 
 **Figurinhas**, in the header, is a drawer of the same machines. Each one has a white edge, a soft shadow, and a small tilt. **Na nota** drops it into the open note. **No canvas** puts it on the board as its own piece: the canvas still draws note cards, and a sticker sits beside them so you can drag it. It is not a second copy of a note.
 
-`![[figure:crdt|sticker|animated]]` loops that machine. `![[figure:crdt|sticker]]` holds still. The flags can come in any order. `tilt:-3` turns it, from -12 to 12 degrees. Older lines still work: `![[figure:wikilinks]]` is the full instrument, and `|sticker` alone is a still sticker.
+From the toolbar, a sticker can loop or hold still, and the rotation slider turns it a little, from -12 to 12 degrees. A full figure is the instrument; a sticker is the small card. Notes saved before this editor still open as the same cards.
 
 Export stays on this device. From the note or the drawer: SVG, a transparent PNG at 512 and at 1024, and an animated SVG. The animation is the same `place` loop, written as SVG motion, so it needs no GIF or WebP encoder and stays sharp. `prefers-reduced-motion` freezes the live loop.
 
@@ -73,7 +87,7 @@ Export stays on this device. From the note or the drawer: SVG, a transparent PNG
 
 The feature does nothing until you paste your own key. The key lives in this browser’s `localStorage`, labelled in the settings panel, and it is sent only to the provider you pick: xAI, OpenAI, or another HTTPS endpoint that speaks the OpenAI chat-completions format. There is a button to remove it. No key is shipped with Locus. Anthropic is not offered: its API is not a browser call of that shape. Nothing on the network runs until you press **Gerar**.
 
-A saved figure is `ideia-<nome>`. It takes the same flags as the rest (`|sticker`, `|animated`, `|still`, `|tilt:`), and it can sit in a note, the drawer, or the canvas. **Minhas figuras** renames or deletes it. Deleting it leaves the note line, which then reads as an unknown figure.
+A saved figure is named from what you asked. It can sit in a note, the drawer, or the canvas, full size or as a sticker, still or animated. **Minhas figuras** renames or deletes it. Deleting it leaves the card, which then reads as an unknown figure.
 
 ![The key stays on this device](docs/assets/idea-settings.png)
 
@@ -159,8 +173,9 @@ npm run build
 ## Project structure
 
 ```
-src/components/locus/   notes, canvas, notebook, graph, atlas
-src/lib/vault/          store, markdown, notebook, retrieval, patterns
+src/components/locus/   notes, visual editor, canvas, notebook, graph, atlas
+src/lib/vault/          store, markdown, seal, notebook, retrieval, patterns
+src/lib/media/          photos and video in IndexedDB, encrypted with a locked note
 src/lib/auth/           optional Better Auth, off unless you turn it on
 src/lib/db.ts           PGLite fallback or Postgres via DATABASE_URL
 src/routes/             TanStack Start routes

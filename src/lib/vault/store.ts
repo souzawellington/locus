@@ -1,12 +1,27 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { messageId, planTurn, runReadOnly } from "./agent";
-import { formatFigureEmbed, rewriteWikilinks, type FigureMotion, type FigureSize } from "./markdown";
-import { findNote, findNoteLoose } from "./retrieve";
+import { recryptMedia } from "@/lib/media/db";
+import { formatFigureEmbed, mediaIds, rewriteWikilinks, type FigureMotion, type FigureSize } from "./markdown";
+import { findNote, findNoteLoose, presentNotes } from "./retrieve";
 import { seedCells, seedNotes } from "./seed";
 import type { SavedIdea } from "@/figures/idea/schema";
 import { ideaSlug } from "@/figures/idea/schema";
-import type { BoardSticker, CanvasPos, ChatMessage, ConfirmState, Note, NoteDraft, NotebookCell, WorkspaceView, WriteMode } from "./types";
+import {
+  createPinRecord,
+  encryptWithKey,
+  forgetAllKeys,
+  forgetDevicePin,
+  forgetKey,
+  openText,
+  readPinRecord,
+  rememberDevicePin,
+  rememberKey,
+  sealText,
+  sessionKey,
+  writePinRecord,
+} from "./seal";
+import type { BoardSticker, CanvasPos, ChatMessage, ConfirmState, Note, NoteDraft, NotebookCell, OpenNote, WorkspaceView, WriteMode } from "./types";
 
 type Theme = "light" | "dark";
 
@@ -17,6 +32,8 @@ type VaultState = {
   stickers: BoardSticker[];
   ideas: SavedIdea[];
   ideaOpen: boolean;
+  openNotes: Record<string, OpenNote>;
+  sourceChosen: boolean;
   cells: NotebookCell[];
   messages: ChatMessage[];
   activeId: string;
@@ -34,6 +51,15 @@ type VaultState = {
   setQuery: (query: string) => void;
   setView: (view: WorkspaceView) => void;
   setMode: (mode: WriteMode) => void;
+  setSourceChosen: (on: boolean) => void;
+  hasDevicePin: boolean;
+  setDevicePin: (pin: string) => Promise<void>;
+  clearDevicePin: () => void;
+  ensureNote: (title: string) => string;
+  lockNote: (id: string, password: string, hideTitle: boolean) => Promise<void>;
+  unlockNote: (id: string, password: string) => Promise<boolean>;
+  unlockAllNow: () => void;
+  removeSeal: (id: string) => Promise<void>;
   cycleMode: () => void;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
@@ -126,7 +152,22 @@ function blank(title: string, body: string): Note {
   };
 }
 
-const modes: WriteMode[] = ["source", "blocks", "read"];
+const modes: WriteMode[] = ["visual", "read"];
+
+const sealTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function scheduleSeal(id: string, title: string, body: string, write: (id: string, sealPatch: { iv: string; data: string }) => void) {
+  const pending = sealTimers.get(id);
+  if (pending) clearTimeout(pending);
+  sealTimers.set(
+    id,
+    setTimeout(() => {
+      const key = sessionKey(id);
+      if (!key) return;
+      void encryptWithKey(key, JSON.stringify({ title, body })).then((packed) => write(id, packed));
+    }, 400),
+  );
+}
 
 const initialNotes = seedNotes();
 
@@ -137,11 +178,14 @@ export const useVault = create<VaultState>()(
       stickers: [],
       ideas: [],
       ideaOpen: false,
+      openNotes: {},
+      sourceChosen: false,
+      hasDevicePin: typeof localStorage !== "undefined" && readPinRecord() !== null,
       cells: seedCells(),
       messages: [],
       activeId: "n-routine",
       theme: "light",
-      mode: "source",
+      mode: "visual",
       view: "notes",
       sidebarOpen: true,
       focusMode: false,
@@ -154,6 +198,84 @@ export const useVault = create<VaultState>()(
       setQuery: (query) => set({ query }),
       setView: (view) => set({ view, focusMode: view === "notes" ? get().focusMode : false }),
       setMode: (mode) => set({ mode }),
+      setSourceChosen: (sourceChosen) => set({ sourceChosen, mode: sourceChosen ? "source" : "visual" }),
+      setDevicePin: async (pin) => {
+        writePinRecord(await createPinRecord(pin));
+        rememberDevicePin(pin);
+        set({ hasDevicePin: true });
+      },
+      clearDevicePin: () => {
+        writePinRecord(null);
+        forgetDevicePin();
+        set({ hasDevicePin: false });
+      },
+      ensureNote: (title) => {
+        const clean = title.trim() || "Sem título";
+        const found = findNote(get().notes, clean);
+        if (found) return found.id;
+        const note = blank(clean, "");
+        set({ notes: [note, ...get().notes] });
+        return note.id;
+      },
+      lockNote: async (id, password, hideTitle) => {
+        const state = get();
+        const note = state.notes.find((item) => item.id === id);
+        if (!note) return;
+        const open = state.openNotes[id];
+        const title = open?.title || note.title;
+        const body = open?.body ?? (note.seal ? "" : note.body);
+        const previous = sessionKey(id);
+        const { seal, key } = await sealText(JSON.stringify({ title, body }), password);
+        seal.hideTitle = hideTitle;
+        await recryptMedia(mediaIds(body), previous, key);
+        const { [id]: _drop, ...rest } = state.openNotes;
+        forgetKey(id);
+        set({
+          openNotes: rest,
+          notes: get().notes.map((item) =>
+            item.id === id ? { ...item, body: "", title: hideTitle ? "Nota trancada" : title, seal, updatedAt: Date.now() } : item,
+          ),
+        });
+      },
+      unlockNote: async (id, password) => {
+        const note = get().notes.find((item) => item.id === id);
+        if (!note?.seal) return true;
+        try {
+          const { plain, key } = await openText(note.seal, password);
+          const parsed = JSON.parse(plain) as { title?: string; body?: string };
+          rememberKey(id, key);
+          set({
+            openNotes: {
+              ...get().openNotes,
+              [id]: { title: parsed.title || note.title, body: parsed.body ?? "" },
+            },
+          });
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      unlockAllNow: () => {
+        forgetAllKeys();
+        set({ openNotes: {} });
+      },
+      removeSeal: async (id) => {
+        const open = get().openNotes[id];
+        const note = get().notes.find((item) => item.id === id);
+        if (!note) return;
+        const key = sessionKey(id);
+        if (key && open) await recryptMedia(mediaIds(open.body), key, undefined);
+        const { [id]: _drop, ...rest } = get().openNotes;
+        forgetKey(id);
+        set({
+          openNotes: rest,
+          notes: get().notes.map((item) =>
+            item.id === id
+              ? { ...item, seal: undefined, title: open?.title || item.title, body: open?.body ?? item.body, updatedAt: Date.now() }
+              : item,
+          ),
+        });
+      },
       cycleMode: () => {
         const current = modes.indexOf(get().mode);
         const next = modes[(current + 1) % modes.length] ?? "source";
@@ -179,32 +301,45 @@ export const useVault = create<VaultState>()(
           notes: [note, ...get().notes],
           activeId: note.id,
           view: "notes",
-          mode: "source",
+          mode: "visual",
           focusMode: false,
           focusTick: get().focusTick + 1,
           query: "",
         });
       },
-      updateBody: (id, body) =>
+      updateBody: (id, body) => {
+        const open = get().openNotes[id];
+        if (open) {
+          const next = { ...open, body };
+          set({ openNotes: { ...get().openNotes, [id]: next } });
+          scheduleSeal(id, next.title, body, (noteId, packed) => {
+            set({
+              notes: get().notes.map((note) =>
+                note.id === noteId && note.seal ? { ...note, body: "", seal: { ...note.seal, ...packed }, updatedAt: Date.now() } : note,
+              ),
+            });
+          });
+          return;
+        }
+        const note = get().notes.find((item) => item.id === id);
+        if (note?.seal) return;
         set({
-          notes: get().notes.map((note) => (note.id === id ? { ...note, body, updatedAt: Date.now() } : note)),
-        }),
+          notes: get().notes.map((item) => (item.id === id ? { ...item, body, updatedAt: Date.now() } : item)),
+        });
+      },
       insertFigure: (slug, options) => {
         const line = formatFigureEmbed({ slug, ...options });
         const state = get();
         const note = state.notes.find((item) => item.id === state.activeId);
         if (!note) {
           const created = blank("Figura", `${line}\n`);
-          set({ notes: [created, ...state.notes], activeId: created.id, view: "notes", mode: "read", paletteOpen: false });
+          set({ notes: [created, ...state.notes], activeId: created.id, view: "notes", mode: "visual", paletteOpen: false });
           return;
         }
-        const body = note.body.includes(line) ? note.body : `${note.body.trim()}\n\n${line}\n`;
-        set({
-          notes: state.notes.map((item) => (item.id === note.id ? { ...item, body, updatedAt: Date.now() } : item)),
-          view: "notes",
-          mode: "read",
-          paletteOpen: false,
-        });
+        const current = state.openNotes[note.id]?.body ?? (note.seal ? "" : note.body);
+        const body = current.includes(line) ? current : `${current.trim()}\n\n${line}\n`;
+        get().updateBody(note.id, body);
+        set({ view: "notes", mode: "visual", paletteOpen: false });
       },
       placeSticker: ({ slug, animated = true, tilt }) => {
         const list = get().stickers ?? [];
@@ -238,12 +373,29 @@ export const useVault = create<VaultState>()(
       renameIdea: (slug, title, nextSlug) => {
         const clean = ideaSlug(nextSlug.replace(/^ideia-/, ""), (get().ideas ?? []).filter((item) => item.slug !== slug).map((item) => item.slug));
         const target = clean === slug ? slug : clean;
+        const swap = (body: string) => body.replace(new RegExp(`!\\[\\[figure:${slug}(?=[|\\]])`, "g"), `![[figure:${target}`);
+        const openNotes = { ...get().openNotes };
+        for (const [noteId, open] of Object.entries(openNotes)) {
+          const body = swap(open.body);
+          if (body === open.body) continue;
+          openNotes[noteId] = { ...open, body };
+          if (get().notes.find((item) => item.id === noteId)?.seal) {
+            scheduleSeal(noteId, open.title, body, (sealedId, packed) => {
+              set({
+                notes: get().notes.map((item) =>
+                  item.id === sealedId && item.seal ? { ...item, body: "", seal: { ...item.seal, ...packed }, updatedAt: Date.now() } : item,
+                ),
+              });
+            });
+          }
+        }
         set({
           ideas: (get().ideas ?? []).map((item) => (item.slug === slug ? { ...item, title: title.trim() || item.title, slug: target } : item)),
           stickers: (get().stickers ?? []).map((sticker) => (sticker.slug === slug ? { ...sticker, slug: target } : sticker)),
+          openNotes,
           notes: get().notes.map((note) => ({
             ...note,
-            body: note.body.replace(new RegExp(`!\\[\\[figure:${slug}(?=[|\\]])`, "g"), `![[figure:${target}`),
+            body: note.seal ? "" : swap(note.body),
           })),
         });
       },
@@ -252,32 +404,74 @@ export const useVault = create<VaultState>()(
           ideas: (get().ideas ?? []).filter((item) => item.slug !== slug),
           stickers: (get().stickers ?? []).filter((sticker) => sticker.slug !== slug),
         }),
-      updateTitle: (id, title) =>
+      updateTitle: (id, title) => {
+        const state = get();
+        const open = state.openNotes[id];
+        const note = state.notes.find((item) => item.id === id);
+        if (open && note?.seal) {
+          const next = { ...open, title };
+          set({
+            openNotes: { ...state.openNotes, [id]: next },
+            notes: state.notes.map((item) =>
+              item.id === id && !item.seal?.hideTitle ? { ...item, title, updatedAt: Date.now() } : item,
+            ),
+          });
+          scheduleSeal(id, title, next.body, (noteId, packed) => {
+            set({
+              notes: get().notes.map((item) =>
+                item.id === noteId && item.seal ? { ...item, body: "", seal: { ...item.seal, ...packed }, updatedAt: Date.now() } : item,
+              ),
+            });
+          });
+          return;
+        }
+        if (note?.seal) return;
         set({
-          notes: get().notes.map((note) => (note.id === id ? { ...note, title } : note)),
-        }),
+          notes: state.notes.map((item) => (item.id === id ? { ...item, title } : item)),
+        });
+      },
       commitRename: (id, from, to) => {
         const next = to.trim();
         const prev = from.trim();
         if (!next || next.toLowerCase() === prev.toLowerCase()) {
-          set({
-            notes: get().notes.map((note) => (note.id === id ? { ...note, title: next || prev || "Sem título" } : note)),
-          });
+          get().updateTitle(id, next || prev || "Sem título");
           return;
         }
+        const state = get();
+        const openNotes = { ...state.openNotes };
+        for (const [noteId, open] of Object.entries(openNotes)) {
+          openNotes[noteId] = {
+            title: noteId === id ? next : open.title,
+            body: rewriteWikilinks(open.body, prev, next),
+          };
+        }
         set({
-          notes: get().notes.map((note) => ({
-            ...note,
-            title: note.id === id ? next : note.title,
-            body: rewriteWikilinks(note.body, prev, next),
-            updatedAt: note.id === id || note.body !== rewriteWikilinks(note.body, prev, next) ? Date.now() : note.updatedAt,
-          })),
+          openNotes,
+          notes: state.notes.map((note) => {
+            const sealed = Boolean(note.seal);
+            const body = sealed ? "" : rewriteWikilinks(note.body, prev, next);
+            const title = note.id === id ? (note.seal?.hideTitle ? note.title : next) : note.title;
+            const changed = note.id === id || body !== note.body;
+            return { ...note, title, body, updatedAt: changed ? Date.now() : note.updatedAt };
+          }),
         });
+        for (const [noteId, open] of Object.entries(openNotes)) {
+          if (!get().notes.find((item) => item.id === noteId)?.seal) continue;
+          scheduleSeal(noteId, open.title, open.body, (noteId, packed) => {
+            set({
+              notes: get().notes.map((item) =>
+                item.id === noteId && item.seal ? { ...item, body: "", seal: { ...item.seal, ...packed }, updatedAt: Date.now() } : item,
+              ),
+            });
+          });
+        }
       },
       deleteNote: (id) => {
+        forgetKey(id);
         const notes = get().notes.filter((note) => note.id !== id);
         const activeId = get().activeId === id ? (notes[0]?.id ?? "") : get().activeId;
-        set({ notes, activeId, confirm: null });
+        const { [id]: _drop, ...openNotes } = get().openNotes;
+        set({ notes, activeId, confirm: null, openNotes });
       },
       placeOnCanvas: (id) => {
         const notes = get().notes.map((note) => (note.id === id && !note.canvas ? { ...note, canvas: spot(get().notes), updatedAt: Date.now() } : note));
@@ -301,14 +495,15 @@ export const useVault = create<VaultState>()(
           notes: [note, ...get().notes],
           activeId: note.id,
           view: "notes",
-          mode: "source",
+          mode: get().sourceChosen ? "source" : "visual",
           focusTick: get().focusTick + 1,
         });
       },
       ask: (text) => {
         const state = get();
-        const active = state.notes.find((note) => note.id === state.activeId);
-        const plan = planTurn(text, state.notes, active);
+        const readable = presentNotes(state.notes, state.openNotes);
+        const active = readable.find((note) => note.id === state.activeId);
+        const plan = planTurn(text, readable, active);
         const user: ChatMessage = { id: messageId(), role: "user", content: text.trim() };
         if (plan.kind === "fabric") {
           const assistantId = messageId();
@@ -328,7 +523,7 @@ export const useVault = create<VaultState>()(
         if (plan.kind === "reply") {
           assistant = { id: messageId(), role: "assistant", content: plan.content };
         } else if (plan.kind === "search") {
-          const outcome = runReadOnly("vault.search", { query: plan.query }, state.notes, state.cells);
+          const outcome = runReadOnly("vault.search", { query: plan.query }, readable, state.cells);
           assistant = {
             id: messageId(),
             role: "assistant",
@@ -337,7 +532,7 @@ export const useVault = create<VaultState>()(
             trace: { name: "vault.search", readOnly: true, args: { query: plan.query }, status: "done", result: outcome.result },
           };
         } else if (plan.readOnly) {
-          const outcome = runReadOnly(plan.name, plan.args, state.notes, state.cells);
+          const outcome = runReadOnly(plan.name, plan.args, readable, state.cells);
           assistant = {
             id: messageId(),
             role: "assistant",
@@ -391,6 +586,7 @@ export const useVault = create<VaultState>()(
         if (!trace || trace.status !== "pending") return;
         let notes = state.notes;
         let cells = state.cells;
+        let openNotes = state.openNotes;
         let activeId = state.activeId;
         let view = state.view;
         let result = "Nada foi alterado.";
@@ -402,8 +598,22 @@ export const useVault = create<VaultState>()(
           result = `Nota criada: ${note.title}`;
         } else if (trace.name === "vault.append") {
           const target = findNoteLoose(notes, trace.args.title ?? "");
+          const open = target ? openNotes[target.id] : undefined;
           if (!target) result = "Nota não encontrada. Nada foi escrito.";
-          else {
+          else if (target.seal && !open) result = "Nota trancada. Nada foi escrito.";
+          else if (target.seal && open) {
+            const body = `${open.body.trim()}\n\n${trace.args.text ?? ""}\n`;
+            openNotes = { ...openNotes, [target.id]: { ...open, body } };
+            activeId = target.id;
+            result = `Texto acrescentado em ${open.title}.`;
+            scheduleSeal(target.id, open.title, body, (noteId, packed) => {
+              set({
+                notes: get().notes.map((note) =>
+                  note.id === noteId && note.seal ? { ...note, body: "", seal: { ...note.seal, ...packed }, updatedAt: Date.now() } : note,
+                ),
+              });
+            });
+          } else {
             notes = notes.map((note) =>
               note.id === target.id ? { ...note, body: `${note.body.trim()}\n\n${trace.args.text ?? ""}\n`, updatedAt: Date.now() } : note,
             );
@@ -446,6 +656,7 @@ export const useVault = create<VaultState>()(
         set({
           notes,
           cells,
+          openNotes,
           activeId,
           view,
           messages: state.messages.map((item) =>
@@ -462,14 +673,17 @@ export const useVault = create<VaultState>()(
           ),
         }),
       resetVault: () => {
+        forgetAllKeys();
         const notes = seedNotes();
         set({
           notes,
           stickers: [],
+          openNotes: {},
           cells: seedCells(),
           messages: [],
           activeId: "n-routine",
-          mode: "source",
+          sourceChosen: false,
+          mode: "visual",
           view: "notes",
           confirm: null,
           query: "",
@@ -482,10 +696,27 @@ export const useVault = create<VaultState>()(
       name: "locus-vault-v1",
       storage: createJSONStorage(storage),
       skipHydration: true,
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<VaultState>;
+        const legacy = !persisted || typeof persisted !== "object" || !("sourceChosen" in persisted);
+        const sourceChosen = legacy ? false : Boolean(saved.sourceChosen);
+        const mode: WriteMode =
+          legacy || saved.mode === "blocks" || (!sourceChosen && saved.mode === "source") ? "visual" : (saved.mode ?? "visual");
+        return {
+          ...current,
+          ...saved,
+          ideas: saved.ideas ?? [],
+          stickers: saved.stickers ?? [],
+          openNotes: {},
+          sourceChosen,
+          mode,
+        };
+      },
       partialize: (state) => ({
         notes: state.notes,
         stickers: state.stickers,
         ideas: state.ideas,
+        sourceChosen: state.sourceChosen,
         cells: state.cells,
         messages: state.messages,
         activeId: state.activeId,

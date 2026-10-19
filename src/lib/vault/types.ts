@@ -9,6 +9,14 @@ export type BoardSticker = {
   animated: boolean;
 };
 
+export type NoteSeal = {
+  salt: string;
+  iv: string;
+  data: string;
+  hideTitle: boolean;
+  iterations: number;
+};
+
 export type Note = {
   id: string;
   title: string;
@@ -16,7 +24,10 @@ export type Note = {
   createdAt: number;
   updatedAt: number;
   canvas?: CanvasPos;
+  seal?: NoteSeal;
 };
+
+export type OpenNote = { title: string; body: string };
 
 export type NotebookCell = { id: string; code: string };
 
@@ -52,7 +63,7 @@ export type ChatMessage = {
   draft?: NoteDraft;
 };
 
-export type WriteMode = "source" | "blocks" | "read";
+export type WriteMode = "visual" | "source" | "blocks" | "read";
 export type WorkspaceView = "notes" | "canvas" | "notebook" | "graph" | "atlas";
 
 export type ConfirmState = { kind: "delete"; id: string } | { kind: "reset" } | null;

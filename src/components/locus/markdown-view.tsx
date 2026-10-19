@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { FigureHost } from "@/figures/FigureHost";
+import { loadMedia } from "@/lib/media/db";
 import {
   codeParts,
   headingLevel,
@@ -7,10 +9,12 @@ import {
   parseBlocks,
   parseFigureEmbed,
   parseInline,
+  parseMediaEmbed,
   quoteText,
   type InlineNode,
   type MdBlock,
 } from "@/lib/vault/markdown";
+import { sessionKey } from "@/lib/vault/seal";
 
 function Inline({ nodes, onWiki }: { nodes: InlineNode[]; onWiki: (title: string) => void }) {
   return (
@@ -56,7 +60,41 @@ function Inline({ nodes, onWiki }: { nodes: InlineNode[]; onWiki: (title: string
   );
 }
 
-function BlockView({ block, onWiki }: { block: MdBlock; onWiki: (title: string) => void }) {
+function MediaRead({ id, caption, noteId }: { id: string; caption: string; noteId?: string }) {
+  const [url, setUrl] = useState("");
+  const [video, setVideo] = useState(false);
+  useEffect(() => {
+    let live = true;
+    let current = "";
+    void loadMedia(id, noteId ? sessionKey(noteId) : undefined).then((blob) => {
+      if (!live || !blob) return;
+      current = URL.createObjectURL(blob);
+      setVideo(blob.type.startsWith("video/"));
+      setUrl(current);
+    });
+    return () => {
+      live = false;
+      if (current) URL.revokeObjectURL(current);
+    };
+  }, [id, noteId]);
+  if (!url) return <p className="text-sm text-muted">Mídia neste dispositivo</p>;
+  return video ? (
+    <video src={url} controls className="max-h-80 w-full rounded-md" />
+  ) : (
+    <img src={url} alt={caption || "Foto da nota"} className="max-h-80 w-full rounded-md object-contain" />
+  );
+}
+
+function BlockView({ block, onWiki, noteId }: { block: MdBlock; onWiki: (title: string) => void; noteId?: string }) {
+  const media = parseMediaEmbed(block.raw);
+  if (media) {
+    return (
+      <figure className="flex flex-col gap-2">
+        <MediaRead id={media.id} caption={media.caption} noteId={noteId} />
+        {media.caption ? <figcaption className="text-sm text-muted">{media.caption}</figcaption> : null}
+      </figure>
+    );
+  }
   if (block.kind === "figure") {
     const embed = parseFigureEmbed(block.raw);
     if (!embed) return null;
@@ -115,13 +153,13 @@ function BlockView({ block, onWiki }: { block: MdBlock; onWiki: (title: string) 
   );
 }
 
-export function MarkdownView({ markdown, onWiki }: { markdown: string; onWiki: (title: string) => void }) {
+export function MarkdownView({ markdown, onWiki, noteId }: { markdown: string; onWiki: (title: string) => void; noteId?: string }) {
   const blocks = parseBlocks(markdown);
   if (!blocks.length) return <p className="text-muted">Esta nota ainda não tem texto.</p>;
   return (
     <div className="flex flex-col gap-5">
       {blocks.map((block) => (
-        <BlockView key={block.id} block={block} onWiki={onWiki} />
+        <BlockView key={block.id} block={block} onWiki={onWiki} noteId={noteId} />
       ))}
     </div>
   );

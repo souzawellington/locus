@@ -174,7 +174,7 @@ export function FigureHost({
   if (!machine) {
     return (
       <figure className="rounded-md border border-dashed border-line bg-paper-2 px-4 py-3 text-sm text-muted">
-        Figura desconhecida: <code className="font-mono text-ink">{embed.slug}</code>
+        Esta figura não está neste aparelho.
       </figure>
     );
   }

@@ -1,7 +1,7 @@
-import { Plus, Trash2 } from "lucide-react";
+import { Lock, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { relativeTime } from "@/lib/vault/format";
-import { fold, searchNotes, snippet } from "@/lib/vault/retrieve";
+import { fold, presentNotes, searchNotes, snippet } from "@/lib/vault/retrieve";
 import { useVault } from "@/lib/vault/store";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +25,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
 
 export function Sidebar({ shortcut, hold = false }: { shortcut: string; hold?: boolean }) {
   const notes = useVault((state) => state.notes);
+  const openNotes = useVault((state) => state.openNotes);
   const activeId = useVault((state) => state.activeId);
   const query = useVault((state) => state.query);
   const setQuery = useVault((state) => state.setQuery);
@@ -39,7 +40,7 @@ export function Sidebar({ shortcut, hold = false }: { shortcut: string; hold?: b
     return () => window.clearInterval(timer);
   }, []);
 
-  const visible = searchNotes(notes, query);
+  const visible = searchNotes(presentNotes(notes, openNotes), query);
 
   function move(direction: 1 | -1) {
     if (!visible.length) return;
@@ -111,13 +112,16 @@ export function Sidebar({ shortcut, hold = false }: { shortcut: string; hold?: b
                     active ? "bg-copper-soft" : "hover:bg-paper",
                   )}
                 >
-                  <span className="pr-8 font-medium text-ink">
+                  <span className="flex items-center gap-2 pr-8 font-medium text-ink">
+                    {note.seal && !openNotes[note.id] ? <Lock className="size-3.5 shrink-0 text-copper" aria-label="Trancada" /> : null}
                     <Highlight text={note.title || "Sem título"} query={query} />
                   </span>
                   <span className="text-xs text-muted tabular-nums" data-tick={tick} suppressHydrationWarning>
                     Editado {relativeTime(note.updatedAt)}
                   </span>
-                  <span className="line-clamp-2 text-sm text-muted">{snippet(note, query) || "Sem texto"}</span>
+                  <span className="line-clamp-2 text-sm text-muted">
+                    {note.seal && !openNotes[note.id] ? "Trancada" : snippet(note, query) || "Sem texto"}
+                  </span>
                 </button>
                 <button
                   type="button"

@@ -2,12 +2,13 @@ import { Minus, Plus, Scan } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FigureHost } from "@/figures/FigureHost";
 import { plainText, wikilinkTitles } from "@/lib/vault/markdown";
-import { findNote } from "@/lib/vault/retrieve";
+import { findNote, presentNotes } from "@/lib/vault/retrieve";
 import { useVault } from "@/lib/vault/store";
 import { cn } from "@/lib/utils";
 
 export function CanvasBoard() {
   const notes = useVault((state) => state.notes);
+  const openNotes = useVault((state) => state.openNotes);
   const activeId = useVault((state) => state.activeId);
   const moveCanvas = useVault((state) => state.moveCanvas);
   const select = useVault((state) => state.select);
@@ -18,13 +19,17 @@ export function CanvasBoard() {
   const boardRef = useRef<HTMLDivElement>(null);
   const [pan, setPan] = useState({ x: 40, y: 40 });
   const [scale, setScale] = useState(1);
-  const placed = notes.filter((note) => note.canvas);
+  const placed = useMemo(
+    () => presentNotes(notes, openNotes).filter((note) => note.canvas),
+    [notes, openNotes],
+  );
 
   const edges = useMemo(() => {
     const lines: { key: string; x1: number; y1: number; x2: number; y2: number }[] = [];
     for (const note of placed) {
       if (!note.canvas) continue;
-      for (const title of wikilinkTitles(note.body)) {
+      const hidden = Boolean(note.seal) && !openNotes[note.id];
+      for (const title of wikilinkTitles(hidden ? "" : note.body)) {
         const target = findNote(placed, title);
         if (!target?.canvas || target.id === note.id) continue;
         const key = [note.id, target.id].sort().join(":");
@@ -39,7 +44,7 @@ export function CanvasBoard() {
       }
     }
     return lines;
-  }, [placed]);
+  }, [placed, openNotes]);
 
   function fit() {
     const element = boardRef.current;
@@ -218,8 +223,10 @@ export function CanvasBoard() {
                 )}
                 style={{ left: note.canvas.x, top: note.canvas.y, width: note.canvas.w, height: note.canvas.h }}
               >
-                <h2 className="font-serif text-lg leading-tight text-ink">{note.title}</h2>
-                <p className="line-clamp-4 text-sm leading-snug text-muted">{plainText(note.body)}</p>
+                <h2 className="font-serif text-lg leading-tight text-ink">{note.seal && !openNotes[note.id] ? note.title : note.title}</h2>
+                <p className="line-clamp-4 text-sm leading-snug text-muted">
+                  {note.seal && !openNotes[note.id] ? "Nota trancada" : plainText(note.body)}
+                </p>
                 <button
                   type="button"
                   className="mt-auto h-10 self-start rounded-md px-2 text-sm text-copper"
