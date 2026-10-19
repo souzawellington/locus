@@ -1,0 +1,29 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+.output/
+.nitro/
+.vercel/
+.tanstack/
+.vinxi/
+
+# logs, locks, os
+*.log
+.node_modules.lock
+.DS_Store
+Thumbs.db
+
+# secrets — copy .env.example to .env
+.env
+.env.*
+!.env.example
+
+# local databases and editor state
+*.local
+.pglite/
+*.sqlite
+*.sqlite3
+.idea/
+.vscode/
