@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router";
 import { Command } from "cmdk";
 import { downloadText, slugify } from "@/lib/vault/format";
 import { FIGURES } from "@/figures/geometry/machines";
@@ -34,6 +35,7 @@ export function CommandPalette({ shortcut }: { shortcut: string }) {
   const insertFigure = useVault((state) => state.insertFigure);
   const setIdeaOpen = useVault((state) => state.setIdeaOpen);
   const ideas = useVault((state) => state.ideas) ?? [];
+  const navigate = useNavigate();
 
   function close() {
     setPalette(false);
@@ -161,6 +163,16 @@ export function CommandPalette({ shortcut }: { shortcut: string }) {
           ))}
         </Command.Group>
         <Command.Group heading="Vistas">
+          <Command.Item
+            value="planos pricing tabela"
+            className="rounded-md px-3 py-3 text-sm"
+            onSelect={() => {
+              close();
+              void navigate({ to: "/pricing" });
+            }}
+          >
+            Ver planos
+          </Command.Item>
           {views.map((view) => (
             <Command.Item key={view.id} className="rounded-md px-3 py-3 text-sm" onSelect={() => { setView(view.id); close(); }}>
               {view.label}

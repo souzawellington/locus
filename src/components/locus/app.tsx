@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { FileText, Frame, Library, Map as MapIcon, Moon, PanelLeft, Settings, Sigma, Sun, Waypoints, X } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { idleExpired, lastActiveAt, markActive } from "@/lib/vault/seal";
@@ -208,6 +209,9 @@ export function LocusApp() {
             Trancar agora
           </button>
         ) : null}
+        <Link to="/pricing" className="hidden h-10 items-center rounded-md px-3 text-sm text-muted md:inline-flex">
+          Planos
+        </Link>
         <button type="button" aria-label="Ajustes" onClick={() => setSettingsOpen(true)} className="grid size-11 place-items-center rounded-md">
           <Settings className="size-5" />
         </button>
