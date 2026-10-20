@@ -1006,7 +1006,7 @@ export function VisualEditor({
       )}
       <button
         type="button"
-        className="inline-flex h-11 items-center gap-2 self-start rounded-full border border-line px-4 text-sm text-ink"
+        className="inline-flex h-11 items-center gap-2 self-start rounded-full border border-line px-4 text-sm text-current"
         onClick={() => {
           write(body.trim() ? `${body.trim()}\n\n` : "");
           setMenu({
