@@ -311,7 +311,7 @@ function PlaceCard({
             onChange={(event) => setOrigin(event.target.value)}
             placeholder="Ponto de partida"
             aria-label="Ponto de partida"
-            className="h-11 rounded-md border border-line bg-paper px-3 text-base outline-none"
+            className="h-11 rounded-md border border-line bg-paper px-3 text-base text-ink caret-ink outline-none placeholder:text-muted"
           />
           <div className="flex flex-wrap gap-2">
             <button type="button" className="h-11 rounded-md bg-copper px-4 text-sm text-paper-2" disabled={busy} onClick={() => void fromText()}>
@@ -419,7 +419,7 @@ export function PlaceSearch({ onPick, onClose }: { onPick: (hit: PlaceHit) => vo
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Buscar um lugar ou endereço"
         aria-label="Buscar lugar"
-        className="mt-2 h-11 w-full rounded-md border border-line bg-paper px-3 text-base outline-none"
+        className="mt-2 h-11 w-full rounded-md border border-line bg-paper px-3 text-base text-ink caret-ink outline-none placeholder:text-muted"
       />
       <button type="button" className="mt-2 h-11 text-sm text-copper" onClick={() => void locate()}>
         Usar minha localização

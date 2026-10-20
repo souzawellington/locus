@@ -177,7 +177,7 @@ export function WorldMap() {
             Pergunte ao mapa
           </label>
           <div className="mt-1 flex gap-2">
-            <input id="map-ask" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="O que eu salvei em São Paulo" className="h-11 min-w-0 flex-1 rounded-md border border-line bg-paper-2 px-3 text-base outline-none" />
+            <input id="map-ask" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="O que eu salvei em São Paulo" className="h-11 min-w-0 flex-1 rounded-md border border-line bg-paper-2 px-3 text-base text-ink caret-ink outline-none placeholder:text-muted" />
             <button type="button" className="h-11 rounded-md border border-line px-3 text-sm" onClick={() => startVoice(setQuery)}>
               Voz
             </button>
