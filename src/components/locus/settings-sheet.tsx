@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { readOrsKey, writeOrsKey } from "@/lib/maps/route";
 import { useVault } from "@/lib/vault/store";
@@ -117,7 +118,10 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
           </form>
         )}
         {message ? <p className="mt-2 text-sm text-muted">{message}</p> : null}
-        <button type="button" className="mt-6 h-11 rounded-md border border-line px-4 text-sm" onClick={onClose}>
+        <Link to="/pricing" onClick={onClose} className="mt-6 flex h-11 items-center rounded-md border border-line px-4 text-sm text-ink">
+          Ver planos
+        </Link>
+        <button type="button" className="mt-3 h-11 rounded-md border border-line px-4 text-sm" onClick={onClose}>
           Fechar
         </button>
       </div>

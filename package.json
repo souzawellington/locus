@@ -13,13 +13,14 @@
     "build:dev": "node scripts/with-app-env.mjs vite build --mode development",
     "preview": "node scripts/with-app-env.mjs vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "node --test scripts/migration-plan.test.mjs scripts/sign-out-plan.test.mjs scripts/with-app-env.test.mjs && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts src/lib/preview-path-prefix.test.ts src/lib/vault/markdown.figure.test.ts src/figures/geometry/machines.test.ts src/figures/motion.test.ts src/figures/idea/schema.test.ts src/figures/idea/provider.test.ts src/lib/vault/seal.test.ts src/lib/maps/maps.test.ts src/lib/world/world.test.ts",
+    "test": "node --test scripts/migration-plan.test.mjs scripts/sign-out-plan.test.mjs scripts/with-app-env.test.mjs && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts src/lib/preview-path-prefix.test.ts src/lib/vault/markdown.figure.test.ts src/figures/geometry/machines.test.ts src/figures/motion.test.ts src/figures/idea/schema.test.ts src/figures/idea/provider.test.ts src/lib/vault/seal.test.ts src/lib/maps/maps.test.ts src/lib/world/world.test.ts src/lib/plans.test.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
     "@hookform/resolvers": "^5.7.0",
+    "@number-flow/react": "^0.6.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-avatar": "^1.1.11",
