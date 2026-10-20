@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { TOOLS } from "@/lib/vault/agent";
 import { weaveSource } from "@/lib/vault/weave";
 import { PATTERNS, renderCapture, SAMPLE_SOURCE } from "@/lib/vault/patterns";
 import { useVault } from "@/lib/vault/store";
@@ -7,13 +6,7 @@ import { cn } from "@/lib/utils";
 
 const startedJobs = new Set<string>();
 
-const prompts = [
-  "O que registrei sobre CRDT e sincronização local?",
-  "Como o caderno evita estado oculto?",
-  "Quais riscos um servidor MCP de arquivos tem?",
-  "Cria uma nota sobre revisão semanal",
-  "Calcula mean(amostra)",
-];
+const prompts = ["O que eu anotei hoje?", "O que liguei a Como usar?", "Calcula mean(amostra)", "Cria uma nota sobre o dia"];
 
 export function AtlasView() {
   const messages = useVault((state) => state.messages);
@@ -72,7 +65,7 @@ export function AtlasView() {
     <div className="grid h-full min-h-0 md:grid-cols-[16rem_1fr]">
       <aside className="hidden min-h-0 flex-col gap-5 overflow-y-auto border-r border-line p-4 md:flex">
         <div>
-          <p className="text-xs tracking-wide text-muted uppercase">Biblioteca dos Profissionais</p>
+          <p className="text-xs tracking-wide text-muted uppercase">Biblioteca</p>
           <ul className="mt-3 flex flex-col gap-2">
             {PATTERNS.map((pattern) => (
               <li key={pattern.id}>
@@ -85,34 +78,20 @@ export function AtlasView() {
             ))}
           </ul>
         </div>
-        <div>
-          <p className="text-xs tracking-wide text-muted uppercase">Ferramentas</p>
-          <ul className="mt-3 flex flex-col gap-3">
-            {TOOLS.map((tool) => (
-              <li key={tool.name}>
-                <p className="font-mono text-xs text-ink">{tool.name}</p>
-                <p className="text-xs text-muted">{tool.readOnly ? "só leitura" : "escrita · pede aprovação"}</p>
-                <p className="mt-1 text-sm leading-snug text-ink">{tool.summary}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <p className="text-sm leading-relaxed text-muted">
-          A biblioteca manda só a fonte que você cola. As notas ficam aqui. O CVE-2025-53109 mostrou um servidor MCP de arquivos escapando da pasta por link simbólico. Este host não grava fora do cofre sem um sim.
-        </p>
+        <p className="text-sm leading-relaxed text-muted">A biblioteca lê só a fonte que você cola. A prévia entra nas notas depois de Aprovar.</p>
       </aside>
       <div className="flex min-h-0 flex-col">
         <div className="border-b border-line px-5 py-4">
           <h1 className="font-serif text-3xl text-ink">Atlas</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted">
-            O cofre responde no dispositivo. A Biblioteca dos Profissionais aplica um padrão à fonte colada e só grava depois de Aprovar.
+            Responde com o que está nas notas e diz quando não sabe. A Biblioteca aplica um padrão à fonte colada e só grava depois de Aprovar.
           </p>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {messages.length === 0 ? (
             <div className="mx-auto max-w-3xl">
               <p className="max-w-xl text-muted">
-                Pergunte ao cofre, ou chame um padrão: extract_wisdom, summarize, map_concepts. A resposta da biblioteca é uma pré-visualização com [[ligações]], não uma gravação.
+                Pergunte sobre as notas, ou chame um padrão: extract_wisdom, summarize, map_concepts. A resposta da biblioteca é uma prévia, não uma gravação.
               </p>
             </div>
           ) : (
@@ -131,7 +110,6 @@ export function AtlasView() {
                     <div className="w-full rounded-md border border-line bg-paper px-3 py-2 font-mono text-xs text-muted">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-ink">{message.trace.name}</span>
-                        <span>{message.trace.readOnly ? "só leitura" : "escrita"}</span>
                         <span>
                           {message.trace.status === "pending" ? "aguardando" : message.trace.status === "done" ? "executada" : "recusada"}
                         </span>
@@ -205,13 +183,13 @@ export function AtlasView() {
           </div>
           <div className="mx-auto flex w-full max-w-3xl gap-2">
             <label htmlFor="atlas-ask" className="sr-only">
-              Pergunta ao cofre ou padrão da biblioteca
+              Pergunta ou padrão da biblioteca
             </label>
             <textarea
               id="atlas-ask"
               value={draft}
               rows={draft.includes("\n") ? 6 : 2}
-              placeholder="Pergunte ao cofre, ou extract_wisdom e a fonte. Enter envia."
+              placeholder="Pergunte sobre as notas, ou extract_wisdom e a fonte. Enter envia."
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
@@ -221,7 +199,7 @@ export function AtlasView() {
               }}
               className="min-h-11 flex-1 resize-none rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink outline-none placeholder:text-muted"
             />
-            <button type="submit" disabled={busy} className="h-11 self-end rounded-md bg-copper px-4 text-sm text-paper-2 disabled:opacity-50">
+            <button type="submit" disabled={busy || !draft.trim()} className="h-11 self-end rounded-md bg-copper px-4 text-sm text-paper-2 disabled:opacity-50">
               {busy ? "Lendo" : "Enviar"}
             </button>
           </div>

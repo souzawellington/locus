@@ -108,7 +108,7 @@ function cleanLine(value: string, max: number): string {
 }
 
 export const SAMPLE_SOURCE = `extract_wisdom
-Um cofre local não pede licença à rede para abrir. O CRDT funde edições concorrentes sem um servidor de desempate. Um caderno reativo executa pela dependência, não pela ordem visual. "Mais de um terço dos notebooks públicos não volta a executar." Em uma amostra de 4, 8, 15, 16 e 23, a média só faz sentido depois da série. Antes de gravar qualquer extração, o protocolo pede aprovação humana.`;
+Um caderno abre neste aparelho. As contas se atualizam pela dependência, não pela ordem na página. "Mais de um terço dos notebooks públicos não volta a executar." Em uma amostra de 4, 8, 15, 16 e 23, a média só faz sentido depois da série. Antes de gravar qualquer extração, a prévia pede aprovação.`;
 
 export function ideaName(raw: string): string {
   const clean = raw
@@ -310,7 +310,7 @@ export function captureFromModel(patternId: PatternId, raw: unknown, sourceText:
     recommendations: recommendations.length ? recommendations : local.recommendations,
     numbers: numbers.length ? numbers : local.numbers.filter((value) => numberInSource(value, sourceText)),
     sourceLabel,
-    warning: "O modelo leu apenas a fonte colada, não as notas do cofre. Citações e números só permaneceram quando apareciam no texto.",
+    warning: "O modelo leu apenas a fonte colada, não as suas notas. Citações e números só permaneceram quando apareciam no texto.",
   };
 }
 
@@ -388,7 +388,7 @@ export function renderCapture(capture: Capture, notes: Note[], cells: NotebookCe
   }
   const actions = [
     "cria a nota",
-    fresh.length ? `cria ${fresh.length} ${fresh.length === 1 ? "conceito que ainda não está no cofre" : "conceitos que ainda não estão no cofre"}` : "",
+    fresh.length ? `cria ${fresh.length} ${fresh.length === 1 ? "conceito que ainda não está nas notas" : "conceitos que ainda não estão nas notas"}` : "",
     series.length ? `acrescenta ${series.length} células ao caderno` : "",
     canvas ? "posiciona os cartões no canvas" : "",
   ].filter((item) => item !== "");
@@ -415,7 +415,7 @@ export function renderCapture(capture: Capture, notes: Note[], cells: NotebookCe
       capture.recommendations.map((item) => `- ${item}`),
     ),
     section(
-      "Já no cofre",
+      "Já nas notas",
       known.slice(0, 4).map((note) => `- [[${note.title}]]`),
     ),
     series.length

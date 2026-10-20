@@ -3,7 +3,7 @@ import { captureFromModel, getPattern, isPatternId, localDistill, type Capture, 
 
 export type WeaveResult = { ok: true; capture: Capture } | { ok: false; error: string };
 
-const SYSTEM = `Você extrai estrutura de um texto para um cofre de notas. Regras:
+const SYSTEM = `Você extrai estrutura de um texto para um caderno de notas. Regras:
 - Use apenas o texto fornecido. Não complemente com conhecimento de fora.
 - quotes só pode conter frases literais do texto. Se não houver, use lista vazia.
 - numbers só pode conter números que aparecem no texto.
@@ -69,7 +69,7 @@ async function fetchPublic(raw: string, accept: string): Promise<{ url: URL; tex
   for (let hop = 0; hop < 3; hop += 1) {
     const response = await fetch(current, {
       redirect: "manual",
-      headers: { accept, "user-agent": "Locus/1.0 (cofre local; leitura de fonte)" },
+      headers: { accept, "user-agent": "Locus/1.0 (caderno local; leitura de fonte)" },
       signal: AbortSignal.timeout(8000),
     });
     if (response.status >= 300 && response.status < 400) {

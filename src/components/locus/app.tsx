@@ -177,7 +177,7 @@ export function LocusApp() {
         ) : (
           <span className="hidden items-center gap-2 text-xs text-muted sm:inline-flex">
             <span className="size-1.5 rounded-full bg-copper" aria-hidden />
-            Salvo neste dispositivo
+            Salvo
           </span>
         )}
         <nav className="ml-auto hidden items-center gap-1 md:flex" aria-label="Vistas">

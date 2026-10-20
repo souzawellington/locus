@@ -25,7 +25,7 @@ test("the chat request goes only to the provider and keeps the key out of the ur
 test("openai and a custom https endpoint are built without calling the network", () => {
   const openai = buildIdeaRequest(
     { provider: "openai", baseUrl: "ignored", model: "gpt-4o-mini", apiKey: "sk-openai-test" },
-    { description: "um cofre", previous: null, note: "" },
+    { description: "uma gaveta", previous: null, note: "" },
   );
   assert.equal(openai.url, "https://api.openai.com/v1/chat/completions");
   const custom = buildIdeaRequest(
