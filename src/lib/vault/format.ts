@@ -23,8 +23,8 @@ export function slugify(title: string): string {
   return slug || "nota";
 }
 
-export function downloadText(filename: string, text: string) {
-  const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
+export function downloadText(filename: string, text: string, type = "text/markdown;charset=utf-8") {
+  const blob = new Blob([text], { type });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;

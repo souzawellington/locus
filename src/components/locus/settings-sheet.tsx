@@ -26,6 +26,9 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 md:items-center" role="dialog" aria-label="Ajustes">
       <div className="max-h-[85dvh] w-full max-w-md overflow-auto rounded-t-2xl border border-line bg-paper p-5 md:rounded-lg">
         <h2 className="font-serif text-2xl text-ink">Ajustes</h2>
+        <p className="mt-3 text-sm leading-relaxed text-muted">
+          As notas ficam neste aparelho. Ler não pede nada. Escrever, exportar ou pedir a um modelo que escreva espera Aprovar. Uma nota trancada fica fora da busca, do grafo, do Atlas, da exportação e do mapa até você abrir.
+        </p>
         <label className="mt-5 flex min-h-11 items-start gap-3 text-sm">
           <input
             type="checkbox"

@@ -208,6 +208,15 @@
   box-shadow: 0 6px 14px rgba(26, 23, 20, 0.28);
 }
 
+.note-prose,
+.note-prose .text-ink {
+  color: inherit;
+}
+
+.note-prose .font-serif {
+  font-family: inherit;
+}
+
 .locus-plane {
   width: 0;
   height: 0;

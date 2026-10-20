@@ -17,6 +17,11 @@ export type NoteSeal = {
   iterations: number;
 };
 
+export type NoteColor = "white" | "sand" | "sky" | "leaf" | "rose" | "lilac" | "peach" | "night";
+export type NoteFont = "plex" | "roboto" | "newsreader" | "plex-mono" | "roboto-mono";
+export type InkPoint = { x: number; y: number; p: number };
+export type InkStroke = { color: string; size: number; points: InkPoint[] };
+
 export type Note = {
   id: string;
   title: string;
@@ -25,9 +30,12 @@ export type Note = {
   updatedAt: number;
   canvas?: CanvasPos;
   seal?: NoteSeal;
+  color?: NoteColor;
+  font?: NoteFont;
+  ink?: InkStroke[];
 };
 
-export type OpenNote = { title: string; body: string };
+export type OpenNote = { title: string; body: string; ink: InkStroke[] };
 
 export type NotebookCell = { id: string; code: string };
 

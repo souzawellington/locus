@@ -59,7 +59,7 @@ test("visual blocks round-trip without dropping links, figures or media", () => 
   const source = [
     "Bolo de laranja",
     "",
-    "Veja [[Figuras do cofre]] antes do forno.",
+    "Veja [[Figuras]] antes do forno.",
     "",
     "![[figure:crdt|sticker|animated|tilt:-3]]",
     "",
@@ -74,7 +74,7 @@ test("visual blocks round-trip without dropping links, figures or media", () => 
   ].join("\n");
   const once = roundTripMarkdown(source);
   assert.equal(roundTripMarkdown(once), once);
-  assert.match(once, /\[\[Figuras do cofre\]\]/);
+  assert.match(once, /\[\[Figuras\]\]/);
   assert.match(once, /!\[\[figure:crdt\|sticker\|animated\|tilt:-3\]\]/);
   assert.match(once, /!\[\[media:foto123\|laranja\]\]/);
   assert.match(once, /- \[x\] ovos/);

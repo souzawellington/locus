@@ -215,10 +215,10 @@ export function retrieve(query: string, notes: Note[], limit = 3): Citation[] {
 
 export function composeAnswer(hits: Citation[]): string {
   if (!hits.length) {
-    return "Não encontrei uma passagem no cofre que sustente uma resposta. Nada foi completado com conhecimento de fora das suas notas.";
+    return "Não achei isso nas notas. Não completei com nada de fora.";
   }
   const lines = hits.map((hit, index) => `(${index + 1}) ${hit.title} — ${hit.excerpt}`);
-  return ["Isto está escrito no cofre. Não saiu do dispositivo e não acrescentei fatos de fora.", "", ...lines].join("\n");
+  return ["Isto está nas notas. Não saiu do aparelho e não acrescentei fatos de fora.", "", ...lines].join("\n");
 }
 
 export function findNote(notes: Note[], query: string): Note | undefined {
@@ -242,8 +242,8 @@ export function findNoteLoose(notes: Note[], query: string): Note | undefined {
 export function presentNotes(notes: Note[], openNotes: Record<string, OpenNote>): Note[] {
   return notes.map((note) => {
     const open = openNotes[note.id];
-    if (open) return { ...note, title: open.title, body: open.body };
-    if (note.seal) return { ...note, body: "" };
+    if (open) return { ...note, title: open.title, body: open.body, ink: open.ink };
+    if (note.seal) return { ...note, body: "", ink: [] };
     return note;
   });
 }

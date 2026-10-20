@@ -20,7 +20,7 @@ The interface is in Portuguese.
 
 ## Em português
 
-Locus é um cofre de notas que mora no navegador. Você escreve como num bloco de notas: `/` abre o menu de blocos e `@` liga outra nota pelo nome. Um endereço vira mapa só quando você pede, com o caminho e os links para abrir em outro aplicativo. As mesmas notas vão para o canvas, para um caderno que executa pela dependência e para o Atlas. A resposta aponta o trecho de onde veio. Sem conta e sem nuvem: o texto fica neste dispositivo, e a rede só é chamada quando você cria ou abre um mapa. Exportar é um arquivo que você baixa de propósito.
+Locus é um caderno que mora no navegador. Você escreve como num bloco de notas: `/` abre o menu de blocos e `@` liga outra nota pelo nome. Um endereço vira mapa só quando você pede, com o caminho e os links para abrir em outro aplicativo. As mesmas notas vão para o canvas, para um caderno que executa pela dependência e para o Atlas. A resposta aponta o trecho de onde veio. Sem conta e sem nuvem: o texto fica neste dispositivo, e a rede só é chamada quando você cria ou abre um mapa. Exportar é um arquivo que você baixa de propósito.
 
 ## Features
 
@@ -73,7 +73,7 @@ The flight card, place alerts, and the full-screen map question follow the appro
 
 A figure is a small machine whose working is the idea: a patch bay for linked notes, a composing stick for a merge, a press that waits for approval. Hover or the arrow keys move it. Tap the figure for a small toolbar: full size or sticker, animation on or off, a rotation slider, take apart, export, remove. An unknown figure stays in the note and says so. Nothing is fetched.
 
-Insert one with `/` or **+**, or from the command palette. The sample note **Figuras do cofre** holds the pack. **Edição em blocos** carries a sticker. **Bolo de laranja** is the photo example.
+Insert one with `/` or **+**, or from the command palette. The opening note is a blank page. **Como usar** points at the canvas, the notebook, and the graph.
 
 The drawings are [Anatomy](https://github.com/wheresryan22/anatomy) figures (MIT, Ryan), vendored at `.agents/skills/anatomy` with that license. This pack is SVG only, in the light Locus palette. WebGL and the 3D turn mode are not used. Generated example HTML and PDFs are left out; `node examples/<name>/build.mjs` in that folder rebuilds them.
 
@@ -210,7 +210,7 @@ public/                 favicon and share card
 
 ## Roadmap
 
-The sample notes talk about CRDT sync, WebGPU embeddings, and a larger notebook runtime. Those are essays in the vault, not the engine that stores it. Today the copy that matters is `localStorage` on this browser.
+The opening page is a blank note. Search, the canvas, the notebook, the graph, Atlas, and the map all read that same local copy. Today the copy that matters is `localStorage` on this browser.
 
 What the app already draws a line toward:
 

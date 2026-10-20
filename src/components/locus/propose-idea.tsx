@@ -9,7 +9,7 @@ type Step = "gate" | "settings" | "prompt" | "loading" | "preview" | "error";
 
 function explain(error: unknown): string {
   if (error instanceof IdeaParseError) {
-    if (error.issue === "unsafe") return "A resposta trazia conteúdo que o cofre não aceita. Nada foi guardado.";
+    if (error.issue === "unsafe") return "A resposta trazia conteúdo que não cabe numa figura. Nada foi guardado.";
     if (error.issue === "json") return "A resposta não veio em JSON. Tente de novo.";
     return "A resposta não descrevia uma máquina válida. Tente de novo.";
   }
@@ -212,7 +212,7 @@ export function ProposeIdea({ open, onClose }: { open: boolean; onClose: () => v
           {step === "gate" ? (
             <div className="flex max-w-lg flex-col gap-3">
               <p className="text-sm leading-relaxed text-muted">
-                Descreva uma máquina e o modelo desenha uma figura no mesmo formato das outras. Sem a sua chave, nada é pedido à rede. O resto do cofre continua igual.
+                Descreva uma máquina e o modelo desenha uma figura no mesmo formato das outras. Sem a sua chave, nada é pedido à rede. O resto das notas continua igual.
               </p>
               <button type="button" className="h-11 self-start rounded-md bg-copper px-4 text-sm text-paper-2" onClick={() => setStep("settings")}>
                 Adicionar chave
@@ -248,7 +248,7 @@ export function ProposeIdea({ open, onClose }: { open: boolean; onClose: () => v
               </div>
               <FigureHost embed={{ slug: previewSlug, size: "full", motion: "animated", tilt: 0 }} apart={apart} showExport={false} draft={{ ...figure, slug: previewSlug }} />
               <FigureHost embed={{ slug: previewSlug, size: "sticker", motion: "animated", tilt: -2 }} apart={false} showExport={false} draft={{ ...figure, slug: previewSlug }} />
-              <p className="text-sm text-muted">A figurinha acima repete o mesmo mecanismo. Salvar grava no cofre e na nota aberta.</p>
+              <p className="text-sm text-muted">A figurinha acima repete o mesmo mecanismo. Salvar grava a figura e a nota aberta.</p>
             </div>
           ) : null}
         </div>

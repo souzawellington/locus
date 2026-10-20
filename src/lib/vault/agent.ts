@@ -60,7 +60,7 @@ export function planTurn(text: string, notes: Note[], active: Note | undefined):
       name: "vault.create",
       readOnly: false,
       args: { title: titled, body },
-      preview: `A ferramenta vault.create quer gravar a nota “${titled}”. Nada entra no cofre sem aprovação.`,
+      preview: `Criar a nota “${titled}”?`,
     };
   }
 
@@ -74,7 +74,7 @@ export function planTurn(text: string, notes: Note[], active: Note | undefined):
       name: "vault.append",
       readOnly: false,
       args: { title: note.title, text: append[2].trim() },
-      preview: `A ferramenta vault.append quer acrescentar texto em “${note.title}”.`,
+      preview: `Acrescentar este texto em “${note.title}”?`,
     };
   }
 
@@ -89,7 +89,7 @@ export function planTurn(text: string, notes: Note[], active: Note | undefined):
       name: "canvas.place",
       readOnly: false,
       args: { title: note.title },
-      preview: `A ferramenta canvas.place quer posicionar “${note.title}” no canvas.`,
+      preview: `Colocar “${note.title}” no canvas?`,
     };
   }
 

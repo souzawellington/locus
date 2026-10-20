@@ -1,8 +1,15 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { readInk } from "./appearance";
 import { messageId, planTurn, runReadOnly } from "./agent";
 import { recryptMedia } from "@/lib/media/db";
-import { formatFigureEmbed, mediaIds, rewriteWikilinks, type FigureMotion, type FigureSize } from "./markdown";
+import {
+  formatFigureEmbed,
+  mediaIds,
+  rewriteWikilinks,
+  type FigureMotion,
+  type FigureSize,
+} from "./markdown";
 import { findNote, findNoteLoose, presentNotes } from "./retrieve";
 import { seedCells, seedNotes } from "./seed";
 import type { SavedIdea } from "@/figures/idea/schema";
@@ -21,11 +28,30 @@ import {
   sessionKey,
   writePinRecord,
 } from "./seal";
-import type { BoardSticker, CanvasPos, ChatMessage, ConfirmState, Note, NoteDraft, NotebookCell, OpenNote, WorkspaceView, WriteMode } from "./types";
+import type {
+  BoardSticker,
+  CanvasPos,
+  ChatMessage,
+  ConfirmState,
+  InkStroke,
+  Note,
+  NoteColor,
+  NoteDraft,
+  NoteFont,
+  NotebookCell,
+  OpenNote,
+  WorkspaceView,
+  WriteMode,
+} from "./types";
 
 type Theme = "light" | "dark";
 
-type FabricJob = { assistantId: string; patternId: string; source: string; started: boolean } | null;
+type FabricJob = {
+  assistantId: string;
+  patternId: string;
+  source: string;
+  started: boolean;
+} | null;
 
 type VaultState = {
   notes: Note[];
@@ -74,7 +100,10 @@ type VaultState = {
   select: (id: string) => void;
   createNote: (partial?: { title?: string; body?: string }) => void;
   updateBody: (id: string, body: string) => void;
-  insertFigure: (slug: string, options?: { size?: FigureSize; motion?: FigureMotion; tilt?: number }) => void;
+  insertFigure: (
+    slug: string,
+    options?: { size?: FigureSize; motion?: FigureMotion; tilt?: number },
+  ) => void;
   placeSticker: (sticker: { slug: string; animated?: boolean; tilt?: number }) => void;
   moveSticker: (id: string, x: number, y: number) => void;
   removeSticker: (id: string) => void;
@@ -83,6 +112,8 @@ type VaultState = {
   renameIdea: (slug: string, title: string, nextSlug: string) => void;
   deleteIdea: (slug: string) => void;
   updateTitle: (id: string, title: string) => void;
+  setLook: (id: string, look: { color?: NoteColor; font?: NoteFont }) => void;
+  setInk: (id: string, ink: InkStroke[]) => void;
   commitRename: (id: string, from: string, to: string) => void;
   deleteNote: (id: string) => void;
   placeOnCanvas: (id: string) => void;
@@ -92,7 +123,10 @@ type VaultState = {
   removeCell: (id: string) => void;
   openWiki: (title: string) => void;
   ask: (text: string) => void;
-  resolveFabric: (id: string, outcome: { content: string; draft: NoteDraft; pattern: string } | { error: string }) => void;
+  resolveFabric: (
+    id: string,
+    outcome: { content: string; draft: NoteDraft; pattern: string } | { error: string },
+  ) => void;
   preparePattern: (id: string) => void;
   approve: (id: string) => void;
   refuse: (id: string) => void;
@@ -151,6 +185,8 @@ function blank(title: string, body: string): Note {
     id: crypto.randomUUID(),
     title: title.trim() || "Sem título",
     body,
+    color: "white",
+    font: "plex",
     createdAt: now,
     updatedAt: now,
   };
@@ -160,7 +196,11 @@ const modes: WriteMode[] = ["visual", "read"];
 
 const sealTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-function scheduleSeal(id: string, title: string, body: string, write: (id: string, sealPatch: { iv: string; data: string }) => void) {
+function scheduleSeal(
+  id: string,
+  open: OpenNote,
+  write: (id: string, sealPatch: { iv: string; data: string }) => void,
+) {
   const pending = sealTimers.get(id);
   if (pending) clearTimeout(pending);
   sealTimers.set(
@@ -168,7 +208,10 @@ function scheduleSeal(id: string, title: string, body: string, write: (id: strin
     setTimeout(() => {
       const key = sessionKey(id);
       if (!key) return;
-      void encryptWithKey(key, JSON.stringify({ title, body })).then((packed) => write(id, packed));
+      void encryptWithKey(
+        key,
+        JSON.stringify({ title: open.title, body: open.body, ink: open.ink ?? [] }),
+      ).then((packed) => write(id, packed));
     }, 400),
   );
 }
@@ -189,7 +232,7 @@ export const useVault = create<VaultState>()(
       hasDevicePin: typeof localStorage !== "undefined" && readPinRecord() !== null,
       cells: seedCells(),
       messages: [],
-      activeId: "n-routine",
+      activeId: "n-today",
       theme: "light",
       mode: "visual",
       view: "notes",
@@ -204,7 +247,8 @@ export const useVault = create<VaultState>()(
       setQuery: (query) => set({ query }),
       setView: (view) => set({ view, focusMode: view === "notes" ? get().focusMode : false }),
       setMode: (mode) => set({ mode }),
-      setSourceChosen: (sourceChosen) => set({ sourceChosen, mode: sourceChosen ? "source" : "visual" }),
+      setSourceChosen: (sourceChosen) =>
+        set({ sourceChosen, mode: sourceChosen ? "source" : "visual" }),
       setPlaceSuggest: (placeSuggest) => set({ placeSuggest }),
       setPlaceAlerts: (placeAlerts) => set({ placeAlerts }),
       setDevicePin: async (pin) => {
@@ -232,8 +276,9 @@ export const useVault = create<VaultState>()(
         const open = state.openNotes[id];
         const title = open?.title || note.title;
         const body = open?.body ?? (note.seal ? "" : note.body);
+        const ink = open?.ink ?? (note.seal ? [] : (note.ink ?? []));
         const previous = sessionKey(id);
-        const { seal, key } = await sealText(JSON.stringify({ title, body }), password);
+        const { seal, key } = await sealText(JSON.stringify({ title, body, ink }), password);
         seal.hideTitle = hideTitle;
         await recryptMedia(mediaIds(body), previous, key);
         const { [id]: _drop, ...rest } = state.openNotes;
@@ -241,7 +286,16 @@ export const useVault = create<VaultState>()(
         set({
           openNotes: rest,
           notes: get().notes.map((item) =>
-            item.id === id ? { ...item, body: "", title: hideTitle ? "Nota trancada" : title, seal, updatedAt: Date.now() } : item,
+            item.id === id
+              ? {
+                  ...item,
+                  body: "",
+                  ink: [],
+                  title: hideTitle ? "Nota trancada" : title,
+                  seal,
+                  updatedAt: Date.now(),
+                }
+              : item,
           ),
         });
       },
@@ -250,12 +304,16 @@ export const useVault = create<VaultState>()(
         if (!note?.seal) return true;
         try {
           const { plain, key } = await openText(note.seal, password);
-          const parsed = JSON.parse(plain) as { title?: string; body?: string };
+          const parsed = JSON.parse(plain) as { title?: string; body?: string; ink?: unknown };
           rememberKey(id, key);
           set({
             openNotes: {
               ...get().openNotes,
-              [id]: { title: parsed.title || note.title, body: parsed.body ?? "" },
+              [id]: {
+                title: parsed.title || note.title,
+                body: parsed.body ?? "",
+                ink: readInk(parsed.ink),
+              },
             },
           });
           return true;
@@ -279,7 +337,14 @@ export const useVault = create<VaultState>()(
           openNotes: rest,
           notes: get().notes.map((item) =>
             item.id === id
-              ? { ...item, seal: undefined, title: open?.title || item.title, body: open?.body ?? item.body, updatedAt: Date.now() }
+              ? {
+                  ...item,
+                  seal: undefined,
+                  title: open?.title || item.title,
+                  body: open?.body ?? item.body,
+                  ink: open?.ink ?? item.ink,
+                  updatedAt: Date.now(),
+                }
               : item,
           ),
         });
@@ -293,7 +358,8 @@ export const useVault = create<VaultState>()(
       toggleTheme: () => set({ theme: get().theme === "dark" ? "light" : "dark" }),
       setSidebar: (sidebarOpen) => set({ sidebarOpen }),
       setFocus: (focusMode) => {
-        const wide = typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches;
+        const wide =
+          typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches;
         set({
           focusMode,
           view: focusMode ? "notes" : get().view,
@@ -320,10 +386,18 @@ export const useVault = create<VaultState>()(
         if (open) {
           const next = { ...open, body };
           set({ openNotes: { ...get().openNotes, [id]: next } });
-          scheduleSeal(id, next.title, body, (noteId, packed) => {
+          scheduleSeal(id, next, (noteId, packed) => {
             set({
               notes: get().notes.map((note) =>
-                note.id === noteId && note.seal ? { ...note, body: "", seal: { ...note.seal, ...packed }, updatedAt: Date.now() } : note,
+                note.id === noteId && note.seal
+                  ? {
+                      ...note,
+                      body: "",
+                      ink: [],
+                      seal: { ...note.seal, ...packed },
+                      updatedAt: Date.now(),
+                    }
+                  : note,
               ),
             });
           });
@@ -332,7 +406,9 @@ export const useVault = create<VaultState>()(
         const note = get().notes.find((item) => item.id === id);
         if (note?.seal) return;
         set({
-          notes: get().notes.map((item) => (item.id === id ? { ...item, body, updatedAt: Date.now() } : item)),
+          notes: get().notes.map((item) =>
+            item.id === id ? { ...item, body, updatedAt: Date.now() } : item,
+          ),
         });
       },
       insertFigure: (slug, options) => {
@@ -341,7 +417,13 @@ export const useVault = create<VaultState>()(
         const note = state.notes.find((item) => item.id === state.activeId);
         if (!note) {
           const created = blank("Figura", `${line}\n`);
-          set({ notes: [created, ...state.notes], activeId: created.id, view: "notes", mode: "visual", paletteOpen: false });
+          set({
+            notes: [created, ...state.notes],
+            activeId: created.id,
+            view: "notes",
+            mode: "visual",
+            paletteOpen: false,
+          });
           return;
         }
         const current = state.openNotes[note.id]?.body ?? (note.seal ? "" : note.body);
@@ -352,7 +434,10 @@ export const useVault = create<VaultState>()(
       placeSticker: ({ slug, animated = true, tilt }) => {
         const list = get().stickers ?? [];
         const placedNotes = get().notes.filter((note) => note.canvas);
-        const right = placedNotes.reduce((max, note) => Math.max(max, (note.canvas?.x ?? 0) + (note.canvas?.w ?? 0)), 48);
+        const right = placedNotes.reduce(
+          (max, note) => Math.max(max, (note.canvas?.x ?? 0) + (note.canvas?.w ?? 0)),
+          48,
+        );
         const top = placedNotes.reduce((min, note) => Math.min(min, note.canvas?.y ?? 80), 80);
         const placed: BoardSticker = {
           id: crypto.randomUUID(),
@@ -366,40 +451,64 @@ export const useVault = create<VaultState>()(
       },
       moveSticker: (id, x, y) =>
         set({
-          stickers: (get().stickers ?? []).map((sticker) => (sticker.id === id ? { ...sticker, x, y } : sticker)),
+          stickers: (get().stickers ?? []).map((sticker) =>
+            sticker.id === id ? { ...sticker, x, y } : sticker,
+          ),
         }),
-      removeSticker: (id) => set({ stickers: (get().stickers ?? []).filter((sticker) => sticker.id !== id) }),
+      removeSticker: (id) =>
+        set({ stickers: (get().stickers ?? []).filter((sticker) => sticker.id !== id) }),
       setIdeaOpen: (ideaOpen) => set({ ideaOpen }),
       saveIdea: (idea) => {
         const ideas = get().ideas ?? [];
-        const slug = ideaSlug(idea.slug || idea.name || idea.title, ideas.map((item) => item.slug));
+        const slug = ideaSlug(
+          idea.slug || idea.name || idea.title,
+          ideas.map((item) => item.slug),
+        );
         const saved: SavedIdea = { ...idea, name: idea.name || idea.title, slug };
         set({ ideas: [...ideas, saved] });
         get().insertFigure(slug);
         return slug;
       },
       renameIdea: (slug, title, nextSlug) => {
-        const clean = ideaSlug(nextSlug.replace(/^ideia-/, ""), (get().ideas ?? []).filter((item) => item.slug !== slug).map((item) => item.slug));
+        const clean = ideaSlug(
+          nextSlug.replace(/^ideia-/, ""),
+          (get().ideas ?? []).filter((item) => item.slug !== slug).map((item) => item.slug),
+        );
         const target = clean === slug ? slug : clean;
-        const swap = (body: string) => body.replace(new RegExp(`!\\[\\[figure:${slug}(?=[|\\]])`, "g"), `![[figure:${target}`);
+        const swap = (body: string) =>
+          body.replace(new RegExp(`!\\[\\[figure:${slug}(?=[|\\]])`, "g"), `![[figure:${target}`);
         const openNotes = { ...get().openNotes };
         for (const [noteId, open] of Object.entries(openNotes)) {
           const body = swap(open.body);
           if (body === open.body) continue;
           openNotes[noteId] = { ...open, body };
           if (get().notes.find((item) => item.id === noteId)?.seal) {
-            scheduleSeal(noteId, open.title, body, (sealedId, packed) => {
+            scheduleSeal(noteId, { ...open, body }, (sealedId, packed) => {
               set({
                 notes: get().notes.map((item) =>
-                  item.id === sealedId && item.seal ? { ...item, body: "", seal: { ...item.seal, ...packed }, updatedAt: Date.now() } : item,
+                  item.id === sealedId && item.seal
+                    ? {
+                        ...item,
+                        body: "",
+                        ink: [],
+                        seal: { ...item.seal, ...packed },
+                        updatedAt: Date.now(),
+                      }
+                    : item,
                 ),
               });
             });
           }
         }
         set({
-          ideas: (get().ideas ?? []).map((item) => (item.slug === slug ? { ...item, title: title.trim() || item.title, slug: target } : item)),
-          stickers: (get().stickers ?? []).map((sticker) => (sticker.slug === slug ? { ...sticker, slug: target } : sticker)),
+          ideas: (get().ideas ?? []).map((item) =>
+            item.slug === slug
+              ? { ...item, title: title.trim() || item.title, slug: target }
+              : item,
+          ),
+          stickers: (get().stickers ?? []).map((sticker) =>
+            sticker.slug === slug ? { ...sticker, slug: target } : sticker,
+          ),
           openNotes,
           notes: get().notes.map((note) => ({
             ...note,
@@ -421,13 +530,23 @@ export const useVault = create<VaultState>()(
           set({
             openNotes: { ...state.openNotes, [id]: next },
             notes: state.notes.map((item) =>
-              item.id === id && !item.seal?.hideTitle ? { ...item, title, updatedAt: Date.now() } : item,
+              item.id === id && !item.seal?.hideTitle
+                ? { ...item, title, updatedAt: Date.now() }
+                : item,
             ),
           });
-          scheduleSeal(id, title, next.body, (noteId, packed) => {
+          scheduleSeal(id, next, (noteId, packed) => {
             set({
               notes: get().notes.map((item) =>
-                item.id === noteId && item.seal ? { ...item, body: "", seal: { ...item.seal, ...packed }, updatedAt: Date.now() } : item,
+                item.id === noteId && item.seal
+                  ? {
+                      ...item,
+                      body: "",
+                      ink: [],
+                      seal: { ...item.seal, ...packed },
+                      updatedAt: Date.now(),
+                    }
+                  : item,
               ),
             });
           });
@@ -436,6 +555,42 @@ export const useVault = create<VaultState>()(
         if (note?.seal) return;
         set({
           notes: state.notes.map((item) => (item.id === id ? { ...item, title } : item)),
+        });
+      },
+      setLook: (id, look) =>
+        set({
+          notes: get().notes.map((item) =>
+            item.id === id ? { ...item, ...look, updatedAt: Date.now() } : item,
+          ),
+        }),
+      setInk: (id, ink) => {
+        const open = get().openNotes[id];
+        if (open) {
+          const next = { ...open, ink };
+          set({ openNotes: { ...get().openNotes, [id]: next } });
+          scheduleSeal(id, next, (noteId, packed) => {
+            set({
+              notes: get().notes.map((item) =>
+                item.id === noteId && item.seal
+                  ? {
+                      ...item,
+                      body: "",
+                      ink: [],
+                      seal: { ...item.seal, ...packed },
+                      updatedAt: Date.now(),
+                    }
+                  : item,
+              ),
+            });
+          });
+          return;
+        }
+        const note = get().notes.find((item) => item.id === id);
+        if (note?.seal) return;
+        set({
+          notes: get().notes.map((item) =>
+            item.id === id ? { ...item, ink, updatedAt: Date.now() } : item,
+          ),
         });
       },
       commitRename: (id, from, to) => {
@@ -451,6 +606,7 @@ export const useVault = create<VaultState>()(
           openNotes[noteId] = {
             title: noteId === id ? next : open.title,
             body: rewriteWikilinks(open.body, prev, next),
+            ink: open.ink ?? [],
           };
         }
         set({
@@ -465,10 +621,18 @@ export const useVault = create<VaultState>()(
         });
         for (const [noteId, open] of Object.entries(openNotes)) {
           if (!get().notes.find((item) => item.id === noteId)?.seal) continue;
-          scheduleSeal(noteId, open.title, open.body, (noteId, packed) => {
+          scheduleSeal(noteId, open, (sealedId, packed) => {
             set({
               notes: get().notes.map((item) =>
-                item.id === noteId && item.seal ? { ...item, body: "", seal: { ...item.seal, ...packed }, updatedAt: Date.now() } : item,
+                item.id === sealedId && item.seal
+                  ? {
+                      ...item,
+                      body: "",
+                      ink: [],
+                      seal: { ...item.seal, ...packed },
+                      updatedAt: Date.now(),
+                    }
+                  : item,
               ),
             });
           });
@@ -482,14 +646,21 @@ export const useVault = create<VaultState>()(
         set({ notes, activeId, confirm: null, openNotes });
       },
       placeOnCanvas: (id) => {
-        const notes = get().notes.map((note) => (note.id === id && !note.canvas ? { ...note, canvas: spot(get().notes), updatedAt: Date.now() } : note));
+        const notes = get().notes.map((note) =>
+          note.id === id && !note.canvas
+            ? { ...note, canvas: spot(get().notes), updatedAt: Date.now() }
+            : note,
+        );
         set({ notes, view: "canvas" });
       },
       moveCanvas: (id, x, y) =>
         set({
-          notes: get().notes.map((note) => (note.id === id && note.canvas ? { ...note, canvas: { ...note.canvas, x, y } } : note)),
+          notes: get().notes.map((note) =>
+            note.id === id && note.canvas ? { ...note, canvas: { ...note.canvas, x, y } } : note,
+          ),
         }),
-      updateCell: (id, code) => set({ cells: get().cells.map((cell) => (cell.id === id ? { ...cell, code } : cell)) }),
+      updateCell: (id, code) =>
+        set({ cells: get().cells.map((cell) => (cell.id === id ? { ...cell, code } : cell)) }),
       addCell: () => set({ cells: [...get().cells, { id: crypto.randomUUID(), code: "" }] }),
       removeCell: (id) => set({ cells: get().cells.filter((cell) => cell.id !== id) }),
       openWiki: (title) => {
@@ -518,12 +689,17 @@ export const useVault = create<VaultState>()(
           const assistant: ChatMessage = {
             id: assistantId,
             role: "assistant",
-            content: `Lendo a fonte com \`${plan.patternId}\`. O cofre não foi alterado.`,
+            content: `Lendo a fonte com \`${plan.patternId}\`. Nada foi escrito.`,
           };
           set({
             messages: [...state.messages, user, assistant].slice(-40),
             view: "atlas",
-            fabricJob: { assistantId, patternId: plan.patternId, source: plan.source, started: false },
+            fabricJob: {
+              assistantId,
+              patternId: plan.patternId,
+              source: plan.source,
+              started: false,
+            },
           });
           return;
         }
@@ -537,7 +713,13 @@ export const useVault = create<VaultState>()(
             role: "assistant",
             content: outcome.content,
             citations: outcome.citations,
-            trace: { name: "vault.search", readOnly: true, args: { query: plan.query }, status: "done", result: outcome.result },
+            trace: {
+              name: "vault.search",
+              readOnly: true,
+              args: { query: plan.query },
+              status: "done",
+              result: outcome.result,
+            },
           };
         } else if (plan.readOnly) {
           const outcome = runReadOnly(plan.name, plan.args, readable, state.cells);
@@ -546,7 +728,13 @@ export const useVault = create<VaultState>()(
             role: "assistant",
             content: outcome.content,
             citations: outcome.citations,
-            trace: { name: plan.name, readOnly: true, args: plan.args, status: "done", result: outcome.result },
+            trace: {
+              name: plan.name,
+              readOnly: true,
+              args: plan.args,
+              status: "done",
+              result: outcome.result,
+            },
           };
         } else {
           assistant = {
@@ -556,7 +744,11 @@ export const useVault = create<VaultState>()(
             trace: { name: plan.name, readOnly: false, args: plan.args, status: "pending" },
           };
         }
-        set({ messages: [...state.messages, user, assistant].slice(-40), view: "atlas", fabricJob: null });
+        set({
+          messages: [...state.messages, user, assistant].slice(-40),
+          view: "atlas",
+          fabricJob: null,
+        });
       },
       resolveFabric: (id, outcome) => {
         const state = get();
@@ -586,7 +778,8 @@ export const useVault = create<VaultState>()(
           }),
         });
       },
-      preparePattern: (id) => set({ pendingPrompt: `${id}\n`, view: "atlas", paletteOpen: false, focusMode: false }),
+      preparePattern: (id) =>
+        set({ pendingPrompt: `${id}\n`, view: "atlas", paletteOpen: false, focusMode: false }),
       approve: (id) => {
         const state = get();
         const message = state.messages.find((item) => item.id === id);
@@ -614,16 +807,30 @@ export const useVault = create<VaultState>()(
             openNotes = { ...openNotes, [target.id]: { ...open, body } };
             activeId = target.id;
             result = `Texto acrescentado em ${open.title}.`;
-            scheduleSeal(target.id, open.title, body, (noteId, packed) => {
+            scheduleSeal(target.id, { ...open, body }, (noteId, packed) => {
               set({
                 notes: get().notes.map((note) =>
-                  note.id === noteId && note.seal ? { ...note, body: "", seal: { ...note.seal, ...packed }, updatedAt: Date.now() } : note,
+                  note.id === noteId && note.seal
+                    ? {
+                        ...note,
+                        body: "",
+                        ink: [],
+                        seal: { ...note.seal, ...packed },
+                        updatedAt: Date.now(),
+                      }
+                    : note,
                 ),
               });
             });
           } else {
             notes = notes.map((note) =>
-              note.id === target.id ? { ...note, body: `${note.body.trim()}\n\n${trace.args.text ?? ""}\n`, updatedAt: Date.now() } : note,
+              note.id === target.id
+                ? {
+                    ...note,
+                    body: `${note.body.trim()}\n\n${trace.args.text ?? ""}\n`,
+                    updatedAt: Date.now(),
+                  }
+                : note,
             );
             activeId = target.id;
             result = `Texto acrescentado em ${target.title}.`;
@@ -633,7 +840,11 @@ export const useVault = create<VaultState>()(
           if (!target) result = "Nota não encontrada.";
           else if (target.canvas) result = `${target.title} já estava no canvas.`;
           else {
-            notes = notes.map((note) => (note.id === target.id ? { ...note, canvas: spot(notes), updatedAt: Date.now() } : note));
+            notes = notes.map((note) =>
+              note.id === target.id
+                ? { ...note, canvas: spot(notes), updatedAt: Date.now() }
+                : note,
+            );
             view = "canvas";
             activeId = target.id;
             result = `${target.title} entrou no canvas.`;
@@ -653,7 +864,8 @@ export const useVault = create<VaultState>()(
             created.push(note);
           }
           notes = [...created, ...notes];
-          if (extraCells.length) cells = [...cells, ...extraCells.map((code) => ({ id: crypto.randomUUID(), code }))];
+          if (extraCells.length)
+            cells = [...cells, ...extraCells.map((code) => ({ id: crypto.randomUUID(), code }))];
           activeId = main.id;
           view = "notes";
           const extras = created.length - 1;
@@ -668,7 +880,9 @@ export const useVault = create<VaultState>()(
           activeId,
           view,
           messages: state.messages.map((item) =>
-            item.id === id && item.trace ? { ...item, trace: { ...item.trace, status: "done", result } } : item,
+            item.id === id && item.trace
+              ? { ...item, trace: { ...item.trace, status: "done", result } }
+              : item,
           ),
         });
       },
@@ -676,7 +890,14 @@ export const useVault = create<VaultState>()(
         set({
           messages: get().messages.map((item) =>
             item.id === id && item.trace
-              ? { ...item, trace: { ...item.trace, status: "refused", result: "Recusado. Nada foi escrito." } }
+              ? {
+                  ...item,
+                  trace: {
+                    ...item.trace,
+                    status: "refused",
+                    result: "Recusado. Nada foi escrito.",
+                  },
+                }
               : item,
           ),
         }),
@@ -689,7 +910,7 @@ export const useVault = create<VaultState>()(
           openNotes: {},
           cells: seedCells(),
           messages: [],
-          activeId: "n-routine",
+          activeId: "n-today",
           sourceChosen: false,
           placeSuggest: true,
           placeAlerts: true,
@@ -708,10 +929,13 @@ export const useVault = create<VaultState>()(
       skipHydration: true,
       merge: (persisted, current) => {
         const saved = (persisted ?? {}) as Partial<VaultState>;
-        const legacy = !persisted || typeof persisted !== "object" || !("sourceChosen" in persisted);
+        const legacy =
+          !persisted || typeof persisted !== "object" || !("sourceChosen" in persisted);
         const sourceChosen = legacy ? false : Boolean(saved.sourceChosen);
         const mode: WriteMode =
-          legacy || saved.mode === "blocks" || (!sourceChosen && saved.mode === "source") ? "visual" : (saved.mode ?? "visual");
+          legacy || saved.mode === "blocks" || (!sourceChosen && saved.mode === "source")
+            ? "visual"
+            : (saved.mode ?? "visual");
         return {
           ...current,
           ...saved,

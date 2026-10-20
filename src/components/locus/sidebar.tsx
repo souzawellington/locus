@@ -1,5 +1,6 @@
 import { Lock, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { noteColor } from "@/lib/vault/appearance";
 import { relativeTime } from "@/lib/vault/format";
 import { fold, presentNotes, searchNotes, snippet } from "@/lib/vault/retrieve";
 import { useVault } from "@/lib/vault/store";
@@ -113,6 +114,7 @@ export function Sidebar({ shortcut, hold = false }: { shortcut: string; hold?: b
                   )}
                 >
                   <span className="flex items-center gap-2 pr-8 font-medium text-ink">
+                    <span className="size-2.5 shrink-0 rounded-full border border-line" style={{ background: noteColor(note.color).hex }} aria-hidden />
                     {note.seal && !openNotes[note.id] ? <Lock className="size-3.5 shrink-0 text-copper" aria-label="Trancada" /> : null}
                     <Highlight text={note.title || "Sem título"} query={query} />
                   </span>

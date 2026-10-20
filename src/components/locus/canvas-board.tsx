@@ -1,6 +1,7 @@
 import { Minus, Plus, Scan } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FigureHost } from "@/figures/FigureHost";
+import { noteColor } from "@/lib/vault/appearance";
 import { plainText, wikilinkTitles } from "@/lib/vault/markdown";
 import { findNote, presentNotes } from "@/lib/vault/retrieve";
 import { useVault } from "@/lib/vault/store";
@@ -218,13 +219,13 @@ export function CanvasBoard() {
                 key={note.id}
                 onPointerDown={(event) => onCardDown(event, note.id, note.canvas?.x ?? 0, note.canvas?.y ?? 0)}
                 className={cn(
-                  "absolute flex cursor-grab flex-col gap-2 overflow-hidden rounded-lg border bg-paper-2 p-3 shadow-sm",
+                  "absolute flex cursor-grab flex-col gap-2 overflow-hidden rounded-lg border p-3 shadow-sm",
                   note.id === activeId ? "border-copper" : "border-line",
                 )}
-                style={{ left: note.canvas.x, top: note.canvas.y, width: note.canvas.w, height: note.canvas.h }}
+                style={{ left: note.canvas.x, top: note.canvas.y, width: note.canvas.w, height: note.canvas.h, background: noteColor(note.color).hex, color: noteColor(note.color).ink }}
               >
-                <h2 className="font-serif text-lg leading-tight text-ink">{note.seal && !openNotes[note.id] ? note.title : note.title}</h2>
-                <p className="line-clamp-4 text-sm leading-snug text-muted">
+                <h2 className="font-serif text-lg leading-tight">{note.title}</h2>
+                <p className="line-clamp-4 text-sm leading-snug opacity-70">
                   {note.seal && !openNotes[note.id] ? "Nota trancada" : plainText(note.body)}
                 </p>
                 <button

@@ -52,7 +52,7 @@ export function StickerDrawer({ open, onClose }: { open: boolean; onClose: () =>
           </button>
           <MyIdeas />
           <p className="mb-4 text-sm leading-relaxed text-muted">
-            Cada figurinha é uma máquina do cofre. Solte na nota aberta ou no canvas. A exportação fica neste dispositivo.
+            Cada figurinha é uma máquina da nota. Solte na nota aberta ou no canvas. A exportação fica neste dispositivo.
           </p>
           <ul className="flex flex-col gap-4">
             {FIGURES.map((figure, index) => {

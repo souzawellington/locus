@@ -14,7 +14,7 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "Cofre de notas local: markdown, blocos, canvas, caderno reativo e recuperação com citação no dispositivo.",
+          "Caderno de notas com superpoderes: escreva, desenhe, ligue ideias, pergunte e exporte.",
       },
       { name: "theme-color", content: "#f3efe6" },
     ],
@@ -23,7 +23,7 @@ export const Route = createRootRoute({
       { rel: "stylesheet", href: appCss },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Roboto:ital,wght@0,400;0,500;1,400&family=Roboto+Mono:wght@400;500&display=swap",
       },
       { rel: "manifest", href: "/__grok/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },

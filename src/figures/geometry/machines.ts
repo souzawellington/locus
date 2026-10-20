@@ -183,7 +183,7 @@ function atlas(): Pick<Machine, "groups" | "read"> {
     cyl("tip", -8, 1, 1.8, 24, 8, "hi", { lit: true, steps: 12 }),
     ...knob("arm-knob", 64, 1, 32, 2.8, 4),
   ];
-  const lines = ["CRDT", "caderno", "cofre", "canvas"];
+  const lines = ["nota", "caderno", "mapa", "canvas"];
   return {
     groups: [
       baseGroup(),
@@ -281,7 +281,7 @@ function localVault(): Pick<Machine, "groups" | "read"> {
       { id: "door", place: (_t, apart) => [apart * 28, 0, 0], items: door },
       { id: "drawer", place: (t) => [0, t * 22, 0], items: slip },
     ],
-    read: (t, apart) => (apart > 0.4 ? "porta aberta · o texto ficou" : t > 0.2 ? "gaveta de exportação" : "texto no cofre"),
+    read: (t, apart) => (apart > 0.4 ? "porta aberta · o texto ficou" : t > 0.2 ? "gaveta de exportação" : "texto na nota"),
   };
 }
 
@@ -352,7 +352,7 @@ const specs: Array<Omit<Machine, "width" | "height" | "projection"> & { hint: st
   {
     slug: "local-vault",
     fig: "08",
-    title: "Cofre",
+    title: "Gaveta",
     blurb: "O texto fica na caixa. Exportar é puxar a gaveta.",
     hint: "toque para desmontar",
     caption: "Abrir a porta não envia nada. A gaveta é o único papel que sai.",
