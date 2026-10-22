@@ -85,7 +85,8 @@ export function embed(text: string): Float32Array {
   for (const word of words) {
     add(word, 1);
     if (word.length >= 4) {
-      for (let index = 0; index < word.length - 2; index += 1) add(word.slice(index, index + 3), 0.35);
+      for (let index = 0; index < word.length - 2; index += 1)
+        add(word.slice(index, index + 3), 0.35);
     }
   }
   let norm = 0;
@@ -113,7 +114,9 @@ function chunksOf(notes: Note[]): Chunk[] {
   const chunks: Chunk[] = [];
   for (const note of notes) {
     const blocks = parseBlocks(note.body);
-    const pieces = blocks.length ? blocks.map((block) => plainText(block.raw)) : [plainText(note.body)];
+    const pieces = blocks.length
+      ? blocks.map((block) => plainText(block.raw))
+      : [plainText(note.body)];
     for (const piece of pieces) {
       if (piece.length < 24) continue;
       const text = piece.slice(0, 700);
@@ -154,6 +157,34 @@ function bm25(query: string[], chunks: Chunk[]): number[] {
   });
 }
 
+function scoreChunks(query: string, notes: Note[]): { chunk: Chunk; score: number }[] {
+  const queryTokens = tokens(query);
+  if (!queryTokens.length || !notes.length) return [];
+  const chunks = chunksOf(notes);
+  if (!chunks.length) return [];
+  const queryVector = embed(query);
+  const lexical = bm25(queryTokens, chunks);
+  const maxLexical = Math.max(...lexical, 0.0001);
+  return chunks
+    .map((chunk, index) => {
+      const dense = Math.max(0, cosine(queryVector, chunk.vector));
+      const sparse = (lexical[index] ?? 0) / maxLexical;
+      return { chunk, score: sparse * 0.58 + dense * 0.42 };
+    })
+    .sort((a, b) => b.score - a.score);
+}
+
+export type RankedPassage = { noteId: string; title: string; text: string; score: number };
+
+export function rankPassages(query: string, notes: Note[]): RankedPassage[] {
+  return scoreChunks(query, notes).map(({ chunk, score }) => ({
+    noteId: chunk.noteId,
+    title: chunk.title,
+    text: chunk.text,
+    score,
+  }));
+}
+
 function bestSentence(text: string, query: string[]): string {
   const sentences = text
     .split(/(?<=[.!?])\s+/)
@@ -177,21 +208,7 @@ function bestSentence(text: string, query: string[]): string {
 
 export function retrieve(query: string, notes: Note[], limit = 3): Citation[] {
   const queryTokens = tokens(query);
-  if (!queryTokens.length || !notes.length) return [];
-  const chunks = chunksOf(notes);
-  if (!chunks.length) return [];
-  const queryVector = embed(query);
-  const lexical = bm25(queryTokens, chunks);
-  const maxLexical = Math.max(...lexical, 0.0001);
-  const scored = chunks.map((chunk, index) => {
-    const dense = Math.max(0, cosine(queryVector, chunk.vector));
-    const sparse = (lexical[index] ?? 0) / maxLexical;
-    return {
-      chunk,
-      score: sparse * 0.58 + dense * 0.42,
-    };
-  });
-  scored.sort((a, b) => b.score - a.score);
+  const scored = scoreChunks(query, notes);
   const top = scored[0]?.score ?? 0;
   if (top < 0.3) return [];
   const floor = Math.max(0.3, top * 0.58);
@@ -213,12 +230,16 @@ export function retrieve(query: string, notes: Note[], limit = 3): Citation[] {
   return picked;
 }
 
+export const NOT_IN_NOTES = "Não achei isso nas notas. Não completei com nada de fora.";
+
 export function composeAnswer(hits: Citation[]): string {
-  if (!hits.length) {
-    return "Não achei isso nas notas. Não completei com nada de fora.";
-  }
+  if (!hits.length) return NOT_IN_NOTES;
   const lines = hits.map((hit, index) => `(${index + 1}) ${hit.title} — ${hit.excerpt}`);
-  return ["Isto está nas notas. Não saiu do aparelho e não acrescentei fatos de fora.", "", ...lines].join("\n");
+  return [
+    "Isto está nas notas. Não saiu do aparelho e não acrescentei fatos de fora.",
+    "",
+    ...lines,
+  ].join("\n");
 }
 
 export function findNote(notes: Note[], query: string): Note | undefined {

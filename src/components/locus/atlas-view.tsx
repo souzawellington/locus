@@ -17,6 +17,7 @@ export function AtlasView() {
   const preparePattern = useVault((state) => state.preparePattern);
   const pendingPrompt = useVault((state) => state.pendingPrompt);
   const fabricJob = useVault((state) => state.fabricJob);
+  const atlasPending = useVault((state) => state.atlasPending);
   const [draft, setDraft] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const busy = Boolean(fabricJob);
@@ -56,7 +57,7 @@ export function AtlasView() {
 
   function submit(text: string) {
     const value = text.trim();
-    if (!value || busy) return;
+    if (!value || busy || atlasPending) return;
     ask(value);
     setDraft("");
   }
@@ -199,7 +200,7 @@ export function AtlasView() {
               }}
               className="min-h-11 flex-1 resize-none rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink outline-none placeholder:text-muted"
             />
-            <button type="submit" disabled={busy || !draft.trim()} className="h-11 self-end rounded-md bg-copper px-4 text-sm text-paper-2 disabled:opacity-50">
+            <button type="submit" disabled={busy || atlasPending || !draft.trim()} className="h-11 self-end rounded-md bg-copper px-4 text-sm text-paper-2 disabled:opacity-50">
               {busy ? "Lendo" : "Enviar"}
             </button>
           </div>

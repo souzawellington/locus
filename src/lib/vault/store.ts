@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { readInk } from "./appearance";
+import { askAtlas, atlasReady } from "./atlas-ask";
+import { consultAtlas, resolveAtlasTurn, selectFragments, type AtlasOutcome } from "./atlas";
 import { messageId, planTurn, runReadOnly } from "./agent";
 import { recryptMedia } from "@/lib/media/db";
 import {
@@ -78,6 +80,7 @@ type VaultState = {
   focusTick: number;
   pendingPrompt: string;
   fabricJob: FabricJob;
+  atlasPending: boolean;
   setQuery: (query: string) => void;
   setView: (view: WorkspaceView) => void;
   setMode: (mode: WriteMode) => void;
@@ -218,6 +221,8 @@ function scheduleSeal(
 
 const initialNotes = seedNotes();
 
+let atlasFlight = 0;
+
 export const useVault = create<VaultState>()(
   persist(
     (set, get) => ({
@@ -244,6 +249,7 @@ export const useVault = create<VaultState>()(
       focusTick: 0,
       pendingPrompt: "",
       fabricJob: null,
+      atlasPending: false,
       setQuery: (query) => set({ query }),
       setView: (view) => set({ view, focusMode: view === "notes" ? get().focusMode : false }),
       setMode: (mode) => set({ mode }),
@@ -679,6 +685,7 @@ export const useVault = create<VaultState>()(
         });
       },
       ask: (text) => {
+        if (get().atlasPending) return;
         const state = get();
         const readable = presentNotes(state.notes, state.openNotes);
         const active = readable.find((note) => note.id === state.activeId);
@@ -707,20 +714,64 @@ export const useVault = create<VaultState>()(
         if (plan.kind === "reply") {
           assistant = { id: messageId(), role: "assistant", content: plan.content };
         } else if (plan.kind === "search") {
-          const outcome = runReadOnly("vault.search", { query: plan.query }, readable, state.cells);
-          assistant = {
-            id: messageId(),
-            role: "assistant",
-            content: outcome.content,
-            citations: outcome.citations,
-            trace: {
-              name: "vault.search",
-              readOnly: true,
-              args: { query: plan.query },
-              status: "done",
-              result: outcome.result,
-            },
+          const local = runReadOnly("vault.search", { query: plan.query }, readable, state.cells);
+          const fragments = selectFragments(plan.query, state.notes).map((fragment) => ({
+            noteId: fragment.noteId,
+            title: fragment.title.slice(0, 160),
+            text: fragment.text.slice(0, 700),
+            score: fragment.score,
+          }));
+          const trace = {
+            name: "vault.search",
+            readOnly: true as const,
+            args: { query: plan.query },
+            status: "done" as const,
           };
+          if (!fragments.length) {
+            assistant = {
+              id: messageId(),
+              role: "assistant",
+              content: local.content,
+              citations: local.citations,
+              trace: { ...trace, result: local.result },
+            };
+          } else {
+            const flight = ++atlasFlight;
+            const query = plan.query;
+            set({
+              messages: [...state.messages, user].slice(-40),
+              view: "atlas",
+              fabricJob: null,
+              atlasPending: true,
+            });
+            const finish = (outcome: AtlasOutcome | null) => {
+              if (flight !== atlasFlight) return;
+              const grounded = resolveAtlasTurn(outcome, {
+                content: local.content,
+                citations: local.citations,
+                result: local.result,
+              });
+              const reply: ChatMessage = {
+                id: messageId(),
+                role: "assistant",
+                content: grounded.content,
+                citations: grounded.citations,
+                trace: { ...trace, args: { query }, result: grounded.result },
+              };
+              set({
+                messages: [...get().messages, reply].slice(-40),
+                atlasPending: false,
+              });
+            };
+            void consultAtlas(
+              { question: query.slice(0, 500), fragments },
+              {
+                ready: async () => (await atlasReady()).enabled,
+                ask: (payload) => askAtlas({ data: payload }),
+              },
+            ).then(finish, () => finish(null));
+            return;
+          }
         } else if (plan.readOnly) {
           const outcome = runReadOnly(plan.name, plan.args, readable, state.cells);
           assistant = {
@@ -903,6 +954,7 @@ export const useVault = create<VaultState>()(
         }),
       resetVault: () => {
         forgetAllKeys();
+        atlasFlight += 1;
         const notes = seedNotes();
         set({
           notes,
@@ -919,6 +971,7 @@ export const useVault = create<VaultState>()(
           confirm: null,
           query: "",
           fabricJob: null,
+          atlasPending: false,
           pendingPrompt: "",
         });
       },
@@ -946,6 +999,7 @@ export const useVault = create<VaultState>()(
           placeSuggest: saved.placeSuggest !== false,
           placeAlerts: saved.placeAlerts !== false,
           mode,
+          atlasPending: false,
         };
       },
       partialize: (state) => ({
