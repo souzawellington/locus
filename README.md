@@ -159,7 +159,7 @@ React 19, TanStack Start and Router, Vite, Tailwind CSS 4, Radix, Zustand. The v
 
 Postgres is optional and unused by the notes. With `DATABASE_URL`, server code uses `pg`. Without it, an in-memory PGLite database can apply `migrations/*.sql`. The Better Auth schema lives in `migrations/auth/` and is not applied to the note vault. Sign-in is off (`config/app-env.json` sets `VITE_AUTH_ENABLED` to `false`).
 
-Atlas can call the xAI API when `XAI_API_KEY` is set. Without that key, pattern extraction stays on the local path.
+Atlas questions stay on the device until `GEMINI_API_KEY` is set on the server. With that key, a question and a few retrieved passages go to Gemini 4 Argon, and the reply has to quote those passages. Without the key, or if the call fails, Atlas uses the local answer. Pattern extraction can call the xAI API when `XAI_API_KEY` is set. Without that key, extraction stays on the local path.
 
 ## Getting started
 
