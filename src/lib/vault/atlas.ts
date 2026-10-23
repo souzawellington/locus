@@ -56,7 +56,7 @@ export type Fragment = { noteId: string; title: string; text: string; score: num
 export type AtlasOutcome =
   | { kind: "answer"; content: string; citations: Citation[] }
   | { kind: "unknown" }
-  | { kind: "fallback" };
+  | { kind: "fallback"; reason: string };
 
 export type AtlasGate = { allow(at?: number): boolean };
 
@@ -237,7 +237,7 @@ export function verifyCitations(raw: unknown, fragments: Fragment[]): Citation[]
 }
 
 export function acceptModel(raw: unknown, fragments: Fragment[]): AtlasOutcome {
-  if (!raw || typeof raw !== "object") return { kind: "fallback" };
+  if (!raw || typeof raw !== "object") return { kind: "fallback", reason: "bad-shape" };
   const data = raw as { answer?: unknown; unknown?: unknown; citations?: unknown };
   if (data.unknown === true) return { kind: "unknown" };
   const citations = verifyCitations(data.citations, fragments);
@@ -263,6 +263,15 @@ export function parseModelJson(raw: string): unknown {
     if (start >= 0 && end > start) return JSON.parse(trimmed.slice(start, end + 1));
     throw new Error("json");
   }
+}
+
+export function clipAtlasLog(text: string, secret = ""): string {
+  const hidden = secret ? text.split(secret).join("") : text;
+  return hidden
+    .replace(/AIza[\w-]{8,}/g, "[key]")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 160);
 }
 
 function messageText(body: unknown): string {
@@ -296,6 +305,40 @@ export async function consultAtlas(
   }
 }
 
+export function normalizeGeminiKey(raw: string | undefined): string {
+  let key = (raw ?? "")
+    .trim()
+    .replace(/^['"]+|['"]+$/g, "")
+    .trim();
+  key = key
+    .replace(/^(?:bearer\s+)/i, "")
+    .replace(/^['"]+|['"]+$/g, "")
+    .trim();
+  return key;
+}
+
+async function geminiFailure(response: Response, apiKey: string): Promise<string> {
+  let body = "";
+  try {
+    body = await response.text();
+  } catch {
+    body = "";
+  }
+  let detail = "";
+  try {
+    const parsed = JSON.parse(body) as
+      { error?: { message?: unknown } } | { error?: { message?: unknown } }[];
+    const record = Array.isArray(parsed) ? parsed[0] : parsed;
+    const message = record?.error?.message;
+    if (typeof message === "string") detail = message;
+  } catch {
+    detail = "";
+  }
+  if (!detail) detail = body;
+  const clipped = clipAtlasLog(detail, apiKey);
+  return clipped ? `http-${response.status} ${clipped}` : `http-${response.status}`;
+}
+
 export async function answerWithGemini(
   input: { question: string; fragments: Fragment[] },
   deps: {
@@ -306,9 +349,10 @@ export async function answerWithGemini(
     timeoutMs?: number;
   },
 ): Promise<AtlasOutcome> {
-  const apiKey = deps.apiKey?.trim();
-  if (!apiKey || !input.fragments.length) return { kind: "fallback" };
-  if (deps.gate && !deps.gate.allow(deps.now)) return { kind: "fallback" };
+  const apiKey = normalizeGeminiKey(deps.apiKey);
+  if (!apiKey) return { kind: "fallback", reason: "missing-key" };
+  if (!input.fragments.length) return { kind: "fallback", reason: "no-fragments" };
+  if (deps.gate && !deps.gate.allow(deps.now)) return { kind: "fallback", reason: "rate-limit" };
   const fetchImpl = deps.fetchImpl ?? fetch;
   const payload = buildGeminiPayload(input.question, input.fragments);
   const send = (body: unknown, signal: AbortSignal) =>
@@ -324,14 +368,29 @@ export async function answerWithGemini(
   try {
     const signal = AbortSignal.timeout(deps.timeoutMs ?? GEMINI_TIMEOUT_MS);
     let response = await send(payload, signal);
-    if (response.status === 400) {
+    const failure = response.ok ? "" : await geminiFailure(response, apiKey);
+    if (response.status === 400 && failure && !/valid api key/i.test(failure)) {
+      const first = failure;
       response = await send({ ...payload, response_format: { type: "json_object" } }, signal);
+      if (!response.ok) {
+        const second = await geminiFailure(response, apiKey);
+        return { kind: "fallback", reason: second === first ? first : `${first} | ${second}` };
+      }
+    } else if (!response.ok) {
+      return { kind: "fallback", reason: failure || `http-${response.status}` };
     }
-    if (!response.ok) return { kind: "fallback" };
-    const text = messageText(await response.json());
-    return acceptModel(parseModelJson(text), input.fragments);
-  } catch {
-    return { kind: "fallback" };
+    let parsed: unknown;
+    try {
+      parsed = parseModelJson(messageText(await response.json()));
+    } catch {
+      return { kind: "fallback", reason: "bad-json" };
+    }
+    const accepted = acceptModel(parsed, input.fragments);
+    if (accepted.kind === "fallback") return { kind: "fallback", reason: accepted.reason };
+    return accepted;
+  } catch (error) {
+    const message = error instanceof Error ? error.name : "error";
+    return { kind: "fallback", reason: `exception ${clipAtlasLog(message, apiKey)}` };
   }
 }
 

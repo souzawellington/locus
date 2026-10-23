@@ -4,7 +4,9 @@ import { test } from "node:test";
 import {
   acceptModel,
   answerWithGemini,
+  clipAtlasLog,
   consultAtlas,
+  normalizeGeminiKey,
   ATLAS_SYSTEM,
   buildGeminiPayload,
   createAtlasGate,
@@ -133,13 +135,18 @@ test("no key, timeout, and a bad response fall back without calling out", async 
     { apiKey: "  ", fetchImpl },
   );
   assert.equal(missing.kind, "fallback");
+  if (missing.kind === "fallback") assert.equal(missing.reason, "missing-key");
   assert.equal(calls, 0);
 
   const failed = await answerWithGemini(
     { question: "O que faz o @?", fragments },
-    { apiKey: "test-key", fetchImpl },
+    { apiKey: "test-key-secret", fetchImpl },
   );
   assert.equal(failed.kind, "fallback");
+  if (failed.kind === "fallback") {
+    assert.match(failed.reason, /^http-500/);
+    assert.equal(failed.reason.includes("test-key-secret"), false);
+  }
   assert.equal(calls, 1);
 
   const timedOut = await answerWithGemini(
@@ -177,6 +184,7 @@ test("no key, timeout, and a bad response fall back without calling out", async 
     },
   );
   assert.equal(timedOut.kind, "fallback");
+  if (timedOut.kind === "fallback") assert.match(timedOut.reason, /^exception /);
 
   const local = composeAnswer(retrieve("O que faz o @?", seedNotes()));
   const resolved = resolveAtlasTurn(timedOut, {
@@ -286,7 +294,43 @@ test("rate limit and a 400 retry stay on the mocked fetch", async () => {
     { apiKey: "k", fetchImpl, gate, now: 10_500 },
   );
   assert.equal(second.kind, "fallback");
+  if (second.kind === "fallback") assert.equal(second.reason, "rate-limit");
   assert.equal(calls, 2);
+  assert.equal(
+    clipAtlasLog("key AIzaSyDUMMYKEY1234567890 inside", "plain-secret"),
+    "key [key] inside",
+  );
+  assert.equal(clipAtlasLog("plain-secret leaked", "plain-secret").includes("plain-secret"), false);
+  assert.equal(
+    normalizeGeminiKey('  "Bearer AIzaSyDUMMYKEY1234567890"  '),
+    "AIzaSyDUMMYKEY1234567890",
+  );
+});
+
+test("a rejected Gemini key is reported without repeating the key", async () => {
+  let calls = 0;
+  let auth = "";
+  const outcome = await answerWithGemini(
+    { question: "O que faz o @?", fragments: [howTo] },
+    {
+      apiKey: '"Bearer AIzaSyDUMMYKEY1234567890"',
+      fetchImpl: async (_url, init) => {
+        calls += 1;
+        auth = (init?.headers as Record<string, string>).Authorization;
+        return new Response(
+          JSON.stringify([{ error: { message: "Please pass a valid API key" } }]),
+          { status: 400 },
+        );
+      },
+    },
+  );
+  assert.equal(calls, 1);
+  assert.equal(auth, "Bearer AIzaSyDUMMYKEY1234567890");
+  assert.equal(outcome.kind, "fallback");
+  if (outcome.kind === "fallback") {
+    assert.equal(outcome.reason, "http-400 Please pass a valid API key");
+    assert.equal(outcome.reason.includes("AIza"), false);
+  }
 });
 
 test("without a key the ask is not called, so note text stays put", async () => {
@@ -297,7 +341,7 @@ test("without a key the ask is not called, so note text stays put", async () => 
       ready: async () => false,
       ask: async () => {
         asks += 1;
-        return { kind: "fallback" };
+        return { kind: "fallback", reason: "missing-key" };
       },
     },
   );
@@ -311,7 +355,7 @@ test("without a key the ask is not called, so note text stays put", async () => 
       },
       ask: async () => {
         asks += 1;
-        return { kind: "fallback" };
+        return { kind: "fallback", reason: "missing-key" };
       },
     },
   );
