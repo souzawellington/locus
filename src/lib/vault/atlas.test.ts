@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   acceptModel,
   answerWithGemini,
+  clipAtlasLog,
   consultAtlas,
   ATLAS_SYSTEM,
   buildGeminiPayload,
@@ -133,13 +134,18 @@ test("no key, timeout, and a bad response fall back without calling out", async 
     { apiKey: "  ", fetchImpl },
   );
   assert.equal(missing.kind, "fallback");
+  if (missing.kind === "fallback") assert.equal(missing.reason, "missing-key");
   assert.equal(calls, 0);
 
   const failed = await answerWithGemini(
     { question: "O que faz o @?", fragments },
-    { apiKey: "test-key", fetchImpl },
+    { apiKey: "test-key-secret", fetchImpl },
   );
   assert.equal(failed.kind, "fallback");
+  if (failed.kind === "fallback") {
+    assert.match(failed.reason, /^http-500/);
+    assert.equal(failed.reason.includes("test-key-secret"), false);
+  }
   assert.equal(calls, 1);
 
   const timedOut = await answerWithGemini(
@@ -177,6 +183,7 @@ test("no key, timeout, and a bad response fall back without calling out", async 
     },
   );
   assert.equal(timedOut.kind, "fallback");
+  if (timedOut.kind === "fallback") assert.match(timedOut.reason, /^exception /);
 
   const local = composeAnswer(retrieve("O que faz o @?", seedNotes()));
   const resolved = resolveAtlasTurn(timedOut, {
@@ -286,7 +293,13 @@ test("rate limit and a 400 retry stay on the mocked fetch", async () => {
     { apiKey: "k", fetchImpl, gate, now: 10_500 },
   );
   assert.equal(second.kind, "fallback");
+  if (second.kind === "fallback") assert.equal(second.reason, "rate-limit");
   assert.equal(calls, 2);
+  assert.equal(
+    clipAtlasLog("key AIzaSyDUMMYKEY1234567890 inside", "plain-secret"),
+    "key [key] inside",
+  );
+  assert.equal(clipAtlasLog("plain-secret leaked", "plain-secret").includes("plain-secret"), false);
 });
 
 test("without a key the ask is not called, so note text stays put", async () => {
@@ -297,7 +310,7 @@ test("without a key the ask is not called, so note text stays put", async () => 
       ready: async () => false,
       ask: async () => {
         asks += 1;
-        return { kind: "fallback" };
+        return { kind: "fallback", reason: "missing-key" };
       },
     },
   );
@@ -311,7 +324,7 @@ test("without a key the ask is not called, so note text stays put", async () => 
       },
       ask: async () => {
         asks += 1;
-        return { kind: "fallback" };
+        return { kind: "fallback", reason: "missing-key" };
       },
     },
   );
