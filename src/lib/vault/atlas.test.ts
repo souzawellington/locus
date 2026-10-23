@@ -6,6 +6,7 @@ import {
   answerWithGemini,
   clipAtlasLog,
   consultAtlas,
+  normalizeGeminiKey,
   ATLAS_SYSTEM,
   buildGeminiPayload,
   createAtlasGate,
@@ -300,6 +301,50 @@ test("rate limit and a 400 retry stay on the mocked fetch", async () => {
     "key [key] inside",
   );
   assert.equal(clipAtlasLog("plain-secret leaked", "plain-secret").includes("plain-secret"), false);
+  assert.equal(
+    normalizeGeminiKey('  "Bearer AIzaSyDUMMYKEY1234567890"  '),
+    "AIzaSyDUMMYKEY1234567890",
+  );
+});
+
+test("an invalid bearer key is retried with the Google header", async () => {
+  const modes: string[] = [];
+  const outcome = await answerWithGemini(
+    { question: "O que faz o @?", fragments: [howTo] },
+    {
+      apiKey: "quoted-key",
+      fetchImpl: async (_url, init) => {
+        const headers = init?.headers as Record<string, string>;
+        modes.push(headers.Authorization ? "bearer" : headers["x-goog-api-key"] ? "goog" : "none");
+        if (headers.Authorization) {
+          return new Response(
+            JSON.stringify({ error: { message: "Please pass a valid API key" } }),
+            {
+              status: 400,
+            },
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    answer: "O @ liga outra nota.",
+                    unknown: false,
+                    citations: [{ noteId: "n-how", quote: "@ liga outra nota." }],
+                  }),
+                },
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      },
+    },
+  );
+  assert.deepEqual(modes, ["bearer", "goog"]);
+  assert.equal(outcome.kind, "answer");
 });
 
 test("without a key the ask is not called, so note text stays put", async () => {

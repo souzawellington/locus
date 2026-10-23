@@ -305,6 +305,18 @@ export async function consultAtlas(
   }
 }
 
+export function normalizeGeminiKey(raw: string | undefined): string {
+  let key = (raw ?? "")
+    .trim()
+    .replace(/^['"]+|['"]+$/g, "")
+    .trim();
+  key = key
+    .replace(/^(?:bearer\s+)/i, "")
+    .replace(/^['"]+|['"]+$/g, "")
+    .trim();
+  return key;
+}
+
 async function geminiFailure(response: Response, apiKey: string): Promise<string> {
   let body = "";
   try {
@@ -326,34 +338,44 @@ export async function answerWithGemini(
     timeoutMs?: number;
   },
 ): Promise<AtlasOutcome> {
-  const apiKey = deps.apiKey?.trim();
+  const apiKey = normalizeGeminiKey(deps.apiKey);
   if (!apiKey) return { kind: "fallback", reason: "missing-key" };
   if (!input.fragments.length) return { kind: "fallback", reason: "no-fragments" };
   if (deps.gate && !deps.gate.allow(deps.now)) return { kind: "fallback", reason: "rate-limit" };
   const fetchImpl = deps.fetchImpl ?? fetch;
   const payload = buildGeminiPayload(input.question, input.fragments);
-  const send = (body: unknown, signal: AbortSignal) =>
+  const send = (body: unknown, signal: AbortSignal, mode: "bearer" | "goog") =>
     fetchImpl(GEMINI_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        ...(mode === "bearer"
+          ? { Authorization: `Bearer ${apiKey}` }
+          : { "x-goog-api-key": apiKey }),
       },
       body: JSON.stringify(body),
       signal,
     });
+  const rejectedKey = (reason: string) => /valid api key/i.test(reason);
   try {
     const signal = AbortSignal.timeout(deps.timeoutMs ?? GEMINI_TIMEOUT_MS);
-    let response = await send(payload, signal);
-    if (response.status === 400) {
-      const first = await geminiFailure(response, apiKey);
-      response = await send({ ...payload, response_format: { type: "json_object" } }, signal);
+    let mode: "bearer" | "goog" = "bearer";
+    let response = await send(payload, signal, mode);
+    let failure = response.ok ? "" : await geminiFailure(response, apiKey);
+    if (failure && rejectedKey(failure)) {
+      mode = "goog";
+      response = await send(payload, signal, mode);
+      failure = response.ok ? "" : await geminiFailure(response, apiKey);
+    }
+    if (response.status === 400 && failure && !rejectedKey(failure)) {
+      const first = failure;
+      response = await send({ ...payload, response_format: { type: "json_object" } }, signal, mode);
       if (!response.ok) {
         const second = await geminiFailure(response, apiKey);
         return { kind: "fallback", reason: second === first ? first : `${first} | ${second}` };
       }
     } else if (!response.ok) {
-      return { kind: "fallback", reason: await geminiFailure(response, apiKey) };
+      return { kind: "fallback", reason: failure || `http-${response.status}` };
     }
     let parsed: unknown;
     try {
