@@ -307,44 +307,30 @@ test("rate limit and a 400 retry stay on the mocked fetch", async () => {
   );
 });
 
-test("an invalid bearer key is retried with the Google header", async () => {
-  const modes: string[] = [];
+test("a rejected Gemini key is reported without repeating the key", async () => {
+  let calls = 0;
+  let auth = "";
   const outcome = await answerWithGemini(
     { question: "O que faz o @?", fragments: [howTo] },
     {
-      apiKey: "quoted-key",
+      apiKey: '"Bearer AIzaSyDUMMYKEY1234567890"',
       fetchImpl: async (_url, init) => {
-        const headers = init?.headers as Record<string, string>;
-        modes.push(headers.Authorization ? "bearer" : headers["x-goog-api-key"] ? "goog" : "none");
-        if (headers.Authorization) {
-          return new Response(
-            JSON.stringify({ error: { message: "Please pass a valid API key" } }),
-            {
-              status: 400,
-            },
-          );
-        }
+        calls += 1;
+        auth = (init?.headers as Record<string, string>).Authorization;
         return new Response(
-          JSON.stringify({
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    answer: "O @ liga outra nota.",
-                    unknown: false,
-                    citations: [{ noteId: "n-how", quote: "@ liga outra nota." }],
-                  }),
-                },
-              },
-            ],
-          }),
-          { status: 200 },
+          JSON.stringify([{ error: { message: "Please pass a valid API key" } }]),
+          { status: 400 },
         );
       },
     },
   );
-  assert.deepEqual(modes, ["bearer", "goog"]);
-  assert.equal(outcome.kind, "answer");
+  assert.equal(calls, 1);
+  assert.equal(auth, "Bearer AIzaSyDUMMYKEY1234567890");
+  assert.equal(outcome.kind, "fallback");
+  if (outcome.kind === "fallback") {
+    assert.equal(outcome.reason, "http-400 Please pass a valid API key");
+    assert.equal(outcome.reason.includes("AIza"), false);
+  }
 });
 
 test("without a key the ask is not called, so note text stays put", async () => {
