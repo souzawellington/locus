@@ -39,7 +39,11 @@ const HUMANIZER_RULES = `Texto em português do Brasil, curto, como quem anota n
 - Não abuse de travessões. Prefira ponto ou uma frase só.
 - Não fale de modelo, API, auditoria, segurança ou arquitetura.`;
 
-export function buildFigureCompilationPrompt(userRequest: string, rac: FigureRac): { system: string; user: string } {
+export function buildFigureCompilationPrompt(
+  userRequest: string,
+  rac: FigureRac,
+  repairWarnings: string[] = [],
+): { system: string; user: string } {
   const excerpt = rac.activeNoteExcerpt.replace(/\s+/g, " ").trim().slice(0, 700);
   const linked = rac.linkedNotesSummary
     .slice(0, 4)
@@ -49,6 +53,12 @@ export function buildFigureCompilationPrompt(userRequest: string, rac: FigureRac
     ? `Nota aberta: ${rac.activeNoteTitle.replace(/\s+/g, " ").trim().slice(0, 80)}\n${excerpt}`
     : "Não há trecho de nota para usar.";
   const links = linked.length ? linked.map((line) => `- ${line}`).join("\n") : "- nenhuma";
+  const repair = repairWarnings.length
+    ? `\n\nA figura anterior não serviu. Ajuste só isto:\n${repairWarnings
+        .slice(0, 8)
+        .map((warning) => `- ${warning}`)
+        .join("\n")}`
+    : "";
   return {
     system: `Você descreve uma única máquina isométrica para o Locus, um caderno. O objeto é a explicação. Devolva só JSON do FigureIdeaSpec, sem markdown.
 
@@ -57,7 +67,7 @@ ${ANATOMY_RULES}
 ${HUMANIZER_RULES}
 
 Forma: {"id":"fig-exemplo","title":"Título","subtitle":"Uma frase.","domain":"mechanism","projection":{"type":"isometric","azimuthDeg":45,"elevationDeg":35.264,"scale":1},"defaultParameterT":0.25,"parameterLabel":"curso","parts":[{"id":"base","label":"Base da bancada","technicalRole":"A base mede 80 mm por 40 mm.","strokeTier":"silhouette","surfaceTone":"base","joint":{"type":"fixed","axis":[0,0,1],"origin":[0,0,0],"range":[0,0],"minClearanceMm":1.5},"primitives":[{"kind":"iso-prism","center":[0,0,4],"dimensions":[80,40,8],"chamfer":0}],"calloutAnchor":[0,-24,8]}]}`,
-    user: `Pedido:\n${userRequest.replace(/\s+/g, " ").trim().slice(0, 500) || "Uma bancada com uma peça que corre."}\n\n${note}\n\nNotas ligadas, só o resumo:\n${links}\n\nTema já aplicado pelo caderno: ${rac.preferredTheme.slice(0, 32) || "paper"}. Não escolha cores.`,
+    user: `Pedido:\n${userRequest.replace(/\s+/g, " ").trim().slice(0, 500) || "Uma bancada com uma peça que corre."}\n\n${note}\n\nNotas ligadas, só o resumo:\n${links}\n\nTema já aplicado pelo caderno: ${rac.preferredTheme.slice(0, 32) || "paper"}. Não escolha cores.${repair}`,
   };
 }
 

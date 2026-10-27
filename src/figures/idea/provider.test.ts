@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildIdeaRequest, requestIdea, type IdeaSettings } from "./provider.ts";
+import { benchSpec } from "./examples.ts";
+import { buildIdeaRequest, repairFigureFromModel, requestIdea, type IdeaSettings } from "./provider.ts";
 
 const settings: IdeaSettings = {
   provider: "xai",
@@ -52,4 +53,60 @@ test("requestIdea uses the injected fetch and does not keep going on a bad statu
     () => requestIdea(settings, { description: "x", previous: null, note: "" }, async () => new Response("no", { status: 401 })),
     /401/,
   );
+});
+
+const rac = {
+  activeNoteTitle: "",
+  activeNoteExcerpt: "",
+  linkedNotesSummary: [] as string[],
+  preferredTheme: "paper",
+};
+
+test("a bad figure is sent back at most twice, then the local machine is used", async () => {
+  let calls = 0;
+  const repaired = await repairFigureFromModel({
+    userRequest: "uma bancada",
+    rac,
+    deadline: Date.now() + 2_000,
+    callModel: async (prompt) => {
+      calls += 1;
+      if (calls > 1) assert.match(prompt.user, /não serviu|não descrevia|não veio/);
+      return { title: "não" };
+    },
+  });
+  assert.equal(calls, 3);
+  assert.equal(repaired.fromModel, false);
+  assert.ok(repaired.spec.parts.length >= 2);
+});
+
+test("the second answer is kept when the first one does not close", async () => {
+  let calls = 0;
+  const repaired = await repairFigureFromModel({
+    userRequest: "uma bancada",
+    rac,
+    deadline: Date.now() + 2_000,
+    callModel: async () => {
+      calls += 1;
+      return calls === 1 ? { title: "não" } : benchSpec();
+    },
+  });
+  assert.equal(calls, 2);
+  assert.equal(repaired.fromModel, true);
+  assert.equal(repaired.spec.id, "fig-bancada");
+});
+
+test("a deadline that already passed does not call the model", async () => {
+  let calls = 0;
+  const repaired = await repairFigureFromModel({
+    userRequest: "um relógio comparador",
+    rac,
+    deadline: Date.now() - 5,
+    callModel: async () => {
+      calls += 1;
+      return benchSpec();
+    },
+  });
+  assert.equal(calls, 0);
+  assert.equal(repaired.fromModel, false);
+  assert.match(repaired.spec.id, /relogio|bancada|bico|tanque|placa/);
 });

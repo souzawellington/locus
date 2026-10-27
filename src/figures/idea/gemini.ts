@@ -1,6 +1,6 @@
 import { GEMINI_MODEL, GEMINI_TIMEOUT_MS, GEMINI_URL, parseModelJson } from "../../lib/vault/atlas.ts";
-import { validateAndRepair } from "./compile.ts";
 import { fallbackFor } from "./examples.ts";
+import { FigureModelError, repairFigureFromModel } from "./provider.ts";
 import { buildFigureCompilationPrompt, type FigureRac } from "./prompt.ts";
 
 export const FIGURE_MIN_GAP_MS = 2_000;
@@ -185,26 +185,37 @@ export async function compileWithGemini(
   if (deps.gate && !deps.gate.allow(deps.now)) return local;
   const fetchImpl = deps.fetchImpl ?? fetch;
   const timeoutMs = deps.timeoutMs ?? GEMINI_TIMEOUT_MS;
-  const payload = buildFigureGeminiPayload(input);
+  const deadline = Date.now() + timeoutMs;
   try {
-    let response = await postJson(fetchImpl, payload, apiKey, timeoutMs);
-    if (response.status === 400) {
-      await discard(response);
-      response = await postJson(
-        fetchImpl,
-        { ...payload, response_format: { type: "json_object" } },
-        apiKey,
-        timeoutMs,
-      );
-    }
-    if (!response.ok) {
-      await discard(response);
-      return local;
-    }
-    const raw = parseModelJson(messageText(await response.json()));
-    const verdict = validateAndRepair(raw);
-    if (!verdict.accepted || !verdict.spec) return local;
-    return { kind: "model", specId: verdict.spec.id, spec: verdict.spec };
+    const repaired = await repairFigureFromModel({
+      userRequest: input.userRequest,
+      rac: input,
+      deadline,
+      callModel: async (prompt) => {
+        const left = deadline - Date.now();
+        if (left < 40) throw new FigureModelError("timeout");
+        const body = {
+          ...buildFigureGeminiPayload({ ...input, userRequest: input.userRequest }),
+          messages: [
+            { role: "system", content: prompt.system },
+            { role: "user", content: prompt.user },
+          ],
+        };
+        let response = await postJson(fetchImpl, body, apiKey, left);
+        if (response.status === 400) {
+          await discard(response);
+          const retryLeft = deadline - Date.now();
+          if (retryLeft < 40) throw new FigureModelError("timeout");
+          response = await postJson(fetchImpl, { ...body, response_format: { type: "json_object" } }, apiKey, retryLeft);
+        }
+        if (!response.ok) {
+          await discard(response);
+          throw new FigureModelError("status");
+        }
+        return parseModelJson(messageText(await response.json()));
+      },
+    });
+    return repaired.fromModel ? { kind: "model", specId: repaired.spec.id, spec: repaired.spec } : { kind: "fallback", specId: repaired.spec.id, spec: repaired.spec };
   } catch {
     return local;
   }

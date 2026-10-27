@@ -653,10 +653,10 @@ export function measureAudit(input: {
   const emptyClippingValid =
     !input.emptyDropped && input.polygons.every((polygon) => polygon.points2D.length >= 3 && polygonArea(polygon.points2D) > 1e-4);
   const orderConvergenceValid = orderConverged(input.polygons);
-  if (!affineBoundsValid) warnings.push("limites");
-  if (!emptyClippingValid) warnings.push("vazio");
-  if (!input.clearanceValid) warnings.push("folga");
-  if (!orderConvergenceValid) warnings.push("ordem");
+  if (!affineBoundsValid) warnings.push("Algum traço ficou fora da folha.");
+  if (!emptyClippingValid) warnings.push("Uma peça não gerou face.");
+  if (!input.clearanceValid) warnings.push("Duas peças se cruzam ou ficam perto demais.");
+  if (!orderConvergenceValid) warnings.push("A ordem das faces não fechou.");
   return {
     passed: affineBoundsValid && emptyClippingValid && input.clearanceValid && orderConvergenceValid,
     affineBoundsValid,

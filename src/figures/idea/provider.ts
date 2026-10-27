@@ -1,4 +1,8 @@
-import { IDEA_SYSTEM, ideaUserMessage } from "./prompt.ts";
+import { compileFigureScene } from "../geometry/scene.ts";
+import { validateAndRepair } from "./compile.ts";
+import { fallbackFor } from "./examples.ts";
+import { IDEA_SYSTEM, buildFigureCompilationPrompt, ideaUserMessage, type FigureRac } from "./prompt.ts";
+import type { FigureIdeaSpec } from "./schema.ts";
 
 export type IdeaProvider = "xai" | "openai" | "custom";
 
@@ -88,4 +92,60 @@ export async function requestIdea(
   const content = payload.choices?.[0]?.message?.content;
   if (!content || typeof content !== "string") throw new IdeaRequestError("O fornecedor não devolveu uma figura.");
   return content;
+}
+
+export const REPAIR_SAMPLES = [0, 0.5, 1] as const;
+export const MAX_REPAIR_RETRIES = 2;
+
+/** A transport or time failure. The loop stops instead of spending another try. */
+export class FigureModelError extends Error {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export function verifyMotion(spec: FigureIdeaSpec): { passed: boolean; warnings: string[] } {
+  const warnings: string[] = [];
+  for (const t of REPAIR_SAMPLES) {
+    for (const explode of [0, 1]) {
+      const scene = compileFigureScene(spec, t, { explode });
+      if (scene.audit.passed) continue;
+      const pose = explode ? "aberta" : "montada";
+      for (const warning of scene.audit.warnings) warnings.push(`${pose}, t ${t}: ${warning}`);
+    }
+  }
+  return { passed: warnings.length === 0, warnings: [...new Set(warnings)].slice(0, 8) };
+}
+
+/**
+ * One model answer, then at most two repairs. Each repair sees the last warnings.
+ * The caller owns the clock: a new try does not start after `deadline`.
+ */
+export async function repairFigureFromModel(input: {
+  userRequest: string;
+  rac: FigureRac;
+  deadline: number;
+  callModel: (prompt: { system: string; user: string }) => Promise<unknown>;
+}): Promise<{ spec: FigureIdeaSpec; fromModel: boolean }> {
+  const fallback = fallbackFor(input.userRequest);
+  let warnings: string[] = [];
+  for (let attempt = 0; attempt <= MAX_REPAIR_RETRIES; attempt += 1) {
+    if (Date.now() >= input.deadline) break;
+    try {
+      const prompt = buildFigureCompilationPrompt(input.userRequest, input.rac, warnings);
+      const raw = await input.callModel(prompt);
+      const verdict = validateAndRepair(raw);
+      if (!verdict.accepted || !verdict.spec) {
+        warnings = ["A resposta não descrevia uma máquina que fecha. Afaste as peças que se cruzam."];
+        continue;
+      }
+      const motion = verifyMotion(verdict.spec);
+      if (motion.passed) return { spec: verdict.spec, fromModel: true };
+      warnings = motion.warnings.length ? motion.warnings : ["Afaste as peças que se cruzam."];
+    } catch (error) {
+      if (error instanceof FigureModelError) return { spec: fallback, fromModel: false };
+      warnings = ["A resposta não veio como uma figura."];
+    }
+  }
+  return { spec: fallback, fromModel: false };
 }

@@ -1,9 +1,12 @@
 import { HEIGHT, P, WIDTH, baseGroup, cyl, screws, slab, type Group, type Item } from "../geometry/common.ts";
 import { SCENE_AUDIT_T, machineBySlug, type Machine } from "../geometry/machines.ts";
 import {
+  aabbOf,
+  aabbSurfaceDistance,
   add3,
   compileFigureScene,
   observeClearance,
+  tubeFrames,
   type FigureScene,
   type GeometricAuditReport,
   type V3,
