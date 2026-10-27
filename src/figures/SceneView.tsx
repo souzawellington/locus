@@ -141,11 +141,11 @@ export function SceneView({
             {exploded ? "Montar" : "Desmontar"}
           </button>
           <button type="button" onClick={onToggleDots}>
-            {dots ? "Liso" : "Pontos"}
+            {dots ? "Grade: Pontos" : "Grade: Sólido"}
           </button>
           {onPrint ? (
             <button type="button" onClick={onPrint}>
-              Folha
+              Exportar Prancha SVG
             </button>
           ) : null}
         </div>

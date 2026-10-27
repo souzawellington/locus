@@ -151,16 +151,22 @@
 }
 
 .locus-scene {
+  --surface: var(--paper-2);
+  --foreground: var(--ink);
+  --muted-foreground: var(--muted);
+  --accent: var(--copper);
+  --border: var(--line);
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   margin: 0;
   padding: 0.75rem;
-  color: var(--ink);
-  background: var(--paper-2);
-  border: 1px solid var(--line);
+  color: var(--foreground);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 0.625rem;
   outline: none;
+  font-family: var(--font-mono, "IBM Plex Mono", monospace);
 }
 
 .locus-scene[data-size="sticker"] {
@@ -207,13 +213,15 @@
 }
 
 .locus-scene [data-hot="true"] {
-  stroke: var(--copper);
+  stroke: var(--accent);
 }
 
 .locus-scene text,
 .locus-scene-readout,
-.locus-scene-callout {
-  font-family: var(--font-mono);
+.locus-scene-callout,
+.locus-scene-controls,
+.locus-scene-controls button {
+  font-family: var(--font-mono, "IBM Plex Mono", monospace);
 }
 
 .locus-scene text {
@@ -256,9 +264,9 @@
 .locus-scene-controls button {
   height: 2.25rem;
   border-radius: 999px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   background: var(--paper);
-  color: var(--ink);
+  color: var(--foreground);
   padding: 0 0.75rem;
   font-size: 0.8rem;
 }
