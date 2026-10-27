@@ -502,15 +502,25 @@ export function plateSpec(): FigureIdeaSpec {
   });
 }
 
+export function raptorSpec(): FigureIdeaSpec {
+  const nozzle = nozzleSpec();
+  return parseFigureSpec({
+    ...nozzle,
+    id: "fig-raptor",
+    title: "Motor Raptor",
+    subtitle: "O bico está em corte e a linha de combustível contorna a câmara.",
+  });
+}
+
 export function exampleCatalog(): FigureIdeaSpec[] {
-  return [benchSpec(), dialSpec(), nozzleSpec(), tankSpec(), plateSpec()];
+  return [benchSpec(), dialSpec(), raptorSpec(), tankSpec(), plateSpec()];
 }
 
 export function fallbackFor(request: string): FigureIdeaSpec {
   const text = request.toLowerCase();
-  if (/foguete|bico|motor|empuxo|nozzle|combust/.test(text)) return nozzleSpec();
+  if (/raptor|foguete|motor|empuxo|nozzle|combust|bico/.test(text)) return raptorSpec();
   if (/onda|tanque|ripple|água|agua|luz/.test(text)) return tankSpec();
-  if (/rel[oó]gio|dial|medidor|ponteiro|metrolog/.test(text)) return dialSpec();
+  if (/rel[oó]gio|dial|medidor|ponteiro|comparador|metrolog/.test(text)) return dialSpec();
   if (/gota|placa|bit|mem[oó]ria|comput/.test(text)) return plateSpec();
   return benchSpec();
 }

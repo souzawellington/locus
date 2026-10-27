@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { benchSpec } from "./examples.ts";
+import { benchSpec, dialSpec, fallbackFor, raptorSpec, tankSpec } from "./examples.ts";
+import { validateAndRepair } from "./compile.ts";
 import { buildIdeaRequest, repairFigureFromModel, requestIdea, type IdeaSettings } from "./provider.ts";
 
 const settings: IdeaSettings = {
@@ -93,6 +94,20 @@ test("the second answer is kept when the first one does not close", async () => 
   assert.equal(calls, 2);
   assert.equal(repaired.fromModel, true);
   assert.equal(repaired.spec.id, "fig-bancada");
+});
+
+test("no key is not required: Raptor, the dial and the ripple tank are ready offline", () => {
+  const raptor = fallbackFor("corte do motor raptor");
+  const dial = fallbackFor("relógio comparador");
+  const tank = fallbackFor("tanque de ondas");
+  assert.equal(raptor.id, raptorSpec().id);
+  assert.equal(dial.id, dialSpec().id);
+  assert.equal(tank.id, tankSpec().id);
+  assert.equal(raptor.parts.some((part) => part.surfaceTone === "cutaway"), true);
+  assert.equal(raptor.parts.some((part) => part.primitives.some((primitive) => primitive.kind === "tube")), true);
+  for (const spec of [raptor, dial, tank]) {
+    assert.equal(validateAndRepair(spec).accepted, true, spec.id);
+  }
 });
 
 test("a deadline that already passed does not call the model", async () => {
