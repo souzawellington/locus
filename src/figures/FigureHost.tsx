@@ -201,7 +201,9 @@ function SceneHost({
       />
       {pendingSheet ? (
         <ApproveLine
-          sentence="Exportar a folha desta figura?"
+          sentence="Exportar a prancha desta figura?"
+          yesLabel="Aprovar"
+          noLabel="Recusar"
           onYes={() => {
             downloadText(`locus-${prepared.id}.svg`, pendingSheet, "image/svg+xml");
             setPendingSheet(null);

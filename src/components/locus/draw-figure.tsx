@@ -5,6 +5,7 @@ import { validateAndRepair } from "@/figures/idea/compile";
 import { fallbackFor } from "@/figures/idea/examples";
 import type { FigureIdeaSpec } from "@/figures/idea/schema";
 import { askFigure, figureReady } from "@/lib/vault/figure-ask";
+import { noteIsLocked } from "@/lib/vault/seal";
 import { useVault } from "@/lib/vault/store";
 import { ApproveLine } from "./approve";
 
@@ -26,8 +27,15 @@ export function DrawFigure({ open, onClose }: { open: boolean; onClose: () => vo
   async function draw() {
     setBusy(true);
     setApprove(false);
+    const active = notes.find((item) => item.id === activeId);
+    const ask = (request.trim() || (!noteIsLocked(active) ? active?.title : "") || "uma bancada com uma peça que corre").slice(0, 500);
+    if (noteIsLocked(active)) {
+      setSpec(fallbackFor(ask));
+      setNote("Desenhei uma máquina daqui.");
+      setBusy(false);
+      return;
+    }
     const rac = buildFigureRac(notes, openNotes, activeId, theme);
-    const ask = (request.trim() || rac.activeNoteTitle || "uma bancada com uma peça que corre").slice(0, 500);
     try {
       const ready = await figureReady();
       if (!ready.enabled) {
@@ -99,6 +107,8 @@ export function DrawFigure({ open, onClose }: { open: boolean; onClose: () => vo
       {approve && spec ? (
         <ApproveLine
           sentence="Colocar esta figura na nota?"
+          yesLabel="Aprovar na Nota"
+          noLabel="Recusar"
           onYes={() => {
             const verdict = validateAndRepair(spec);
             if (!verdict.accepted || !verdict.spec) {

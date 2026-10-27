@@ -1,5 +1,6 @@
 import { wikilinkTitles } from "../../lib/vault/markdown.ts";
 import { findNote } from "../../lib/vault/retrieve.ts";
+import { noteIsLocked } from "../../lib/vault/seal.ts";
 import type { Note, OpenNote } from "../../lib/vault/types.ts";
 import type { FigureRac } from "./prompt.ts";
 
@@ -8,7 +9,7 @@ const SUMMARY = 240;
 const LINKS = 4;
 
 function openBody(note: Note, openNotes: Record<string, OpenNote>): string {
-  if (note.seal) return "";
+  if (noteIsLocked(note)) return "";
   return openNotes[note.id]?.body ?? note.body;
 }
 
@@ -20,7 +21,7 @@ export function buildFigureRac(
   preferredTheme: string,
 ): FigureRac {
   const active = notes.find((note) => note.id === activeId);
-  if (!active || active.seal) {
+  if (!active || noteIsLocked(active)) {
     return {
       activeNoteTitle: "",
       activeNoteExcerpt: "",
@@ -32,7 +33,7 @@ export function buildFigureRac(
   const linked: string[] = [];
   for (const title of wikilinkTitles(body)) {
     const note = findNote(notes, title);
-    if (!note || note.seal || note.id === active.id) continue;
+    if (!note || noteIsLocked(note) || note.id === active.id) continue;
     const text = openBody(note, openNotes).replace(/\s+/g, " ").trim().slice(0, SUMMARY);
     if (!text) continue;
     linked.push(`${note.title}: ${text}`);
