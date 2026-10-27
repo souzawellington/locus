@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 const TONES = new Set(["lo", "mid", "hi", "faint"]);
 const KINDS = new Set(["slab", "cylinder", "screw"]);
 const LAYERS = new Set(["body", "moving"]);
@@ -151,4 +153,155 @@ export function validateIdeaFigure(input: unknown): IdeaFigure {
   const readMoved = cleanText(record.readMoved, 48);
   if (!title || !blurb || !caption || !readRest || !readMoved) throw new IdeaParseError("schema");
   return { name: name || title, title, blurb, caption, readRest, readMoved, parts };
+}
+
+export const Vector3Schema = z.tuple([z.number().finite(), z.number().finite(), z.number().finite()]);
+export type Vector3 = z.infer<typeof Vector3Schema>;
+
+export const StrokeTierSchema = z.enum(["silhouette", "crease", "section", "construction"]);
+export type StrokeTier = z.infer<typeof StrokeTierSchema>;
+
+export const SurfaceToneSchema = z.enum(["base", "elevated", "accent", "cutaway"]);
+export type SurfaceTone = z.infer<typeof SurfaceToneSchema>;
+
+const LatheSchema = z.object({
+  kind: z.literal("lathe"),
+  axisOrigin: Vector3Schema,
+  axisDirection: Vector3Schema,
+  profile: z
+    .array(z.object({ axial: z.number().finite(), radius: z.number().finite().min(0) }))
+    .min(2)
+    .max(24),
+  segments: z.number().int().min(12).max(96).default(32),
+  cutawayAngleDeg: z.number().finite().min(0).max(360).optional(),
+});
+
+const TubeSchema = z.object({
+  kind: z.literal("tube"),
+  waypoints: z.array(Vector3Schema).min(2).max(16),
+  radius: z.number().finite().positive().max(80),
+  bendRadius: z.number().finite().positive().max(200).default(4),
+});
+
+const IsoPrismSchema = z.object({
+  kind: z.literal("iso-prism"),
+  center: Vector3Schema,
+  dimensions: z.tuple([
+    z.number().finite().positive().max(400),
+    z.number().finite().positive().max(400),
+    z.number().finite().positive().max(400),
+  ]),
+  chamfer: z.number().finite().min(0).max(40).default(0),
+});
+
+export const GeometryPrimitiveSchema = z.discriminatedUnion("kind", [LatheSchema, TubeSchema, IsoPrismSchema]);
+export type GeometryPrimitive = z.infer<typeof GeometryPrimitiveSchema>;
+
+export const KinematicJointSchema = z.object({
+  type: z.enum(["fixed", "revolute", "prismatic", "exploded-slide"]),
+  axis: Vector3Schema,
+  origin: Vector3Schema,
+  range: z.tuple([z.number().finite(), z.number().finite()]),
+  minClearanceMm: z.number().finite().min(0).max(40).default(1.5),
+});
+export type KinematicJoint = z.infer<typeof KinematicJointSchema>;
+
+export const FigurePartSchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]{1,32}$/),
+  label: z.string().min(1).max(42),
+  technicalRole: z.string().min(1).max(140),
+  telemetryUnit: z.string().max(12).optional(),
+  telemetryFormula: z
+    .object({
+      base: z.number().finite(),
+      slope: z.number().finite(),
+      precision: z.number().int().min(0).max(4),
+    })
+    .optional(),
+  strokeTier: StrokeTierSchema,
+  surfaceTone: SurfaceToneSchema,
+  joint: KinematicJointSchema,
+  primitives: z.array(GeometryPrimitiveSchema).min(1).max(6),
+  calloutAnchor: Vector3Schema,
+});
+export type FigurePart = z.infer<typeof FigurePartSchema>;
+
+export const FigureIdeaSpecSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9-]{1,48}$/),
+    title: z.string().min(1).max(60),
+    subtitle: z.string().min(1).max(110),
+    domain: z.enum(["aerospace", "metrology", "wave-physics", "computing", "mechanism"]),
+    projection: z.object({
+      type: z.enum(["isometric", "trimetric", "dimetric"]),
+      azimuthDeg: z.number().finite().min(-180).max(180).default(45),
+      elevationDeg: z.number().finite().min(-80).max(80).default(35.264),
+      scale: z.number().finite().positive().max(8).default(1),
+    }),
+    defaultParameterT: z.number().finite().min(0).max(1).default(0.25),
+    parameterLabel: z.string().min(1).max(40),
+    parts: z.array(FigurePartSchema).min(2).max(24),
+    vaultSourceNoteId: z.string().max(80).optional(),
+  })
+  .superRefine((spec, ctx) => {
+    const ids = new Set<string>();
+    for (const part of spec.parts) {
+      if (ids.has(part.id)) ctx.addIssue({ code: "custom", message: "id repetido", path: ["parts"] });
+      ids.add(part.id);
+    }
+  });
+export type FigureIdeaSpec = z.infer<typeof FigureIdeaSpecSchema>;
+
+export function sceneSlug(id: string): string {
+  const folded = id
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 42);
+  const stem = folded.replace(/^fig-/, "") || "figura";
+  return `fig-${stem}`.slice(0, 48);
+}
+
+function slugPart(id: string, index: number): string {
+  const folded = id
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24);
+  return folded || `peca-${index + 1}`;
+}
+
+/** Truncates copy and slugs ids so a slightly messy model payload can still be checked. */
+export function coerceFigureSpec(input: unknown): unknown {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
+  const spec = { ...(input as Record<string, unknown>) };
+  if (typeof spec.id === "string") spec.id = sceneSlug(spec.id);
+  if (typeof spec.title === "string") spec.title = spec.title.trim().slice(0, 60);
+  if (typeof spec.subtitle === "string") spec.subtitle = spec.subtitle.trim().slice(0, 110);
+  if (typeof spec.parameterLabel === "string") spec.parameterLabel = spec.parameterLabel.trim().slice(0, 40);
+  if (!Array.isArray(spec.parts)) return spec;
+  const seen = new Set<string>();
+  spec.parts = spec.parts.map((entry, index) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return entry;
+    const part = { ...(entry as Record<string, unknown>) };
+    let id = slugPart(typeof part.id === "string" ? part.id : "", index);
+    while (seen.has(id)) id = `${id}-${index + 1}`.slice(0, 32);
+    seen.add(id);
+    part.id = id;
+    if (typeof part.label === "string") part.label = part.label.trim().slice(0, 42);
+    if (typeof part.technicalRole === "string") part.technicalRole = part.technicalRole.trim().slice(0, 140);
+    if (typeof part.telemetryUnit === "string") part.telemetryUnit = part.telemetryUnit.trim().slice(0, 12);
+    return part;
+  });
+  return spec;
+}
+
+export function parseFigureSpec(input: unknown): FigureIdeaSpec {
+  const parsed = FigureIdeaSpecSchema.safeParse(coerceFigureSpec(input));
+  if (!parsed.success) throw new IdeaParseError("schema");
+  return parsed.data;
 }
