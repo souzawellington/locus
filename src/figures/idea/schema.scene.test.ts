@@ -63,28 +63,43 @@ test("schema rejects a negative radius, a short profile and a single part", () =
     () => parseFigureSpec({ ...base, parts: base.parts.slice(0, 1) }),
     (error: unknown) => error instanceof IdeaParseError && error.issue === "schema",
   );
-  const negative = structuredClone(base);
-  const prism = negative.parts[0]?.primitives[0];
-  if (prism && prism.kind === "iso-prism") prism.dimensions = [-1, 10, 10];
   assert.throws(
-    () => parseFigureSpec(negative),
+    () =>
+      parseFigureSpec({
+        ...base,
+        parts: base.parts.map((part, index) =>
+          index === 0
+            ? { ...part, primitives: [{ kind: "iso-prism", center: [0, 0, 4], dimensions: [-1, 10, 10] }] }
+            : part,
+        ),
+      }),
     (error: unknown) => error instanceof IdeaParseError,
   );
-  const short = structuredClone(base);
-  short.parts[1] = {
-    ...short.parts[1],
-    id: "eixo",
-    primitives: [
-      {
-        kind: "lathe",
-        axisOrigin: [0, 0, 0],
-        axisDirection: [0, 0, 1],
-        profile: [{ axial: 0, radius: 1 }],
-      },
-    ],
-  };
   assert.throws(
-    () => parseFigureSpec(short),
+    () =>
+      parseFigureSpec({
+        ...base,
+        parts: [
+          base.parts[0],
+          {
+            id: "eixo",
+            label: "Eixo do torno",
+            technicalRole: "O eixo tem 4 mm de raio.",
+            strokeTier: "silhouette",
+            surfaceTone: "elevated",
+            joint: { type: "fixed", axis: [0, 0, 1], origin: [0, 0, 0], range: [0, 0] },
+            primitives: [
+              {
+                kind: "lathe",
+                axisOrigin: [0, 0, 0],
+                axisDirection: [0, 0, 1],
+                profile: [{ axial: 0, radius: 1 }],
+              },
+            ],
+            calloutAnchor: [0, 0, 4],
+          },
+        ],
+      }),
     (error: unknown) => error instanceof IdeaParseError,
   );
 });
