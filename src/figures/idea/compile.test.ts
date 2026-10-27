@@ -3,16 +3,23 @@ import { test } from "node:test";
 import { iso } from "../../../.agents/skills/anatomy/kit/iso-kit.ts";
 import { SCENE_AUDIT_T } from "../geometry/machines.ts";
 import {
+  aabbSurfaceDistance,
+  add3,
   calloutsCross,
   distanceToPrimitive,
+  dot3,
+  len3,
   measureAudit,
   observeClearance,
   orderConverged,
   painterSort,
+  parseViewBox,
   posePoint,
   projectPoint,
   restCloud,
+  sub3,
   tubeCenterline,
+  tubeFrames,
 } from "../geometry/scene.ts";
 import { compileFigureScene, validateAndRepair } from "./compile.ts";
 import { benchSpec, exampleCatalog, nozzleSpec } from "./examples.ts";
@@ -84,6 +91,22 @@ test("lathe follows axisDirection and a tube is meshed", () => {
   assert.ok(line.some((point) => point[0] < 10 && point[1] > 0 && point[1] < 10));
 });
 
+test("a tube ring sits in the T-N-B plane and clearance is the AABB gap", () => {
+  const frame = tubeFrames([
+    [0, 0, 0],
+    [0, 0, 20],
+    [0, 10, 20],
+  ])[0];
+  assert.ok(frame);
+  assert.ok(Math.abs(dot3(frame.T, frame.N)) < 1e-6);
+  assert.ok(Math.abs(dot3(frame.T, frame.B)) < 1e-6);
+  assert.ok(Math.abs(len3(frame.B) - 1) < 1e-6);
+  const ring = add3(frame.origin, frame.N);
+  assert.ok(Math.abs(dot3(sub3(ring, frame.origin), frame.T)) < 1e-6);
+  assert.ok(Math.abs(aabbSurfaceDistance({ min: [0, 0, 0], max: [10, 10, 10] }, { min: [40, 0, 0], max: [50, 10, 10] }) - 30) < 1e-6);
+  assert.ok(aabbSurfaceDistance({ min: [0, 0, 0], max: [10, 10, 10] }, { min: [5, 0, 0], max: [15, 10, 10] }) < 0);
+});
+
 test("clearance uses part geometry, not callout anchors", () => {
   const overlapping = pairSpec("fig-cruza", 0);
   const separated = pairSpec("fig-afasta", 30);
@@ -109,7 +132,17 @@ test("audit invariants hold at every sample and bounds are measured", () => {
     assert.equal(sample.audit.affineBoundsValid, true);
     assert.equal(sample.audit.emptyClippingValid, true);
     assert.equal(sample.audit.orderConvergenceValid, true);
-    assert.ok(sample.audit.minClearanceObservedMm >= 1.5);
+    assert.equal(sample.audit.clearanceEnvelopeValid, true);
+    assert.ok(Number.isFinite(sample.audit.minClearanceObservedMm));
+    for (const callout of compileFigureScene(spec, sample.t).callouts) {
+      const box = parseViewBox(compileFigureScene(spec, sample.t).viewBox);
+      assert.ok(box && box.width > 1 && box.height > 1);
+      for (const point of [callout.anchor2D, callout.elbow2D, callout.label2D]) {
+        assert.ok(Number.isFinite(point[0]) && Number.isFinite(point[1]));
+        assert.ok(point[0] > box.minX && point[0] < box.minX + box.width);
+        assert.ok(point[1] > box.minY && point[1] < box.minY + box.height);
+      }
+    }
   }
   const scene = compileFigureScene(spec, 0.25);
   const lied = measureAudit({

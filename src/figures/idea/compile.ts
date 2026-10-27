@@ -1,6 +1,13 @@
 import { HEIGHT, P, WIDTH, baseGroup, cyl, screws, slab, type Group, type Item } from "../geometry/common.ts";
 import { SCENE_AUDIT_T, machineBySlug, type Machine } from "../geometry/machines.ts";
-import { add3, compileFigureScene, observeClearance, type FigureAudit, type FigureScene, type V3 } from "../geometry/scene.ts";
+import {
+  add3,
+  compileFigureScene,
+  observeClearance,
+  type FigureScene,
+  type GeometricAuditReport,
+  type V3,
+} from "../geometry/scene.ts";
 import { sanitizeFigureCopyWithHumanizer } from "./prompt.ts";
 import {
   coerceFigureSpec,
@@ -13,9 +20,10 @@ import {
   type Vector3,
 } from "./schema.ts";
 
-export type { FigureScene, FigureAudit };
+export type { FigureScene, GeometricAuditReport };
+export type FigureAudit = GeometricAuditReport;
 
-export type FigureSample = { t: number; audit: FigureAudit };
+export type FigureSample = { t: number; audit: GeometricAuditReport };
 
 export type FigureVerdict = {
   accepted: boolean;
@@ -74,7 +82,7 @@ function repairClearance(spec: FigureIdeaSpec): FigureIdeaSpec {
   return next;
 }
 
-function auditAt(spec: FigureIdeaSpec, t: number): FigureAudit {
+function auditAt(spec: FigureIdeaSpec, t: number): GeometricAuditReport {
   const rest = compileFigureScene(spec, t, { explode: 0 }).audit;
   const apart = compileFigureScene(spec, t, { explode: 1 }).audit;
   return {
@@ -105,7 +113,7 @@ export function validateAndRepair(input: unknown): FigureVerdict {
   return { accepted: samples.every((sample) => sample.audit.passed), spec, samples };
 }
 
-export { compileFigureScene };
+export { aabbOf, aabbSurfaceDistance, compileFigureScene, tubeFrames };
 
 function partItems(part: IdeaPart): Item[] {
   if (part.kind === "screw") return screws(part.id, [[part.x, part.y, part.z]]);

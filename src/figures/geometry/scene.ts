@@ -39,7 +39,7 @@ export type FigureReadout = {
   role: string;
 };
 
-export type FigureAudit = {
+export type GeometricAuditReport = {
   passed: boolean;
   affineBoundsValid: boolean;
   emptyClippingValid: boolean;
@@ -49,12 +49,14 @@ export type FigureAudit = {
   warnings: string[];
 };
 
+export type FigureAudit = GeometricAuditReport;
+
 export type FigureScene = {
   viewBox: string;
   polygons: FigurePolygon[];
   callouts: FigureCallout[];
   readouts: FigureReadout[];
-  audit: FigureAudit;
+  audit: GeometricAuditReport;
 };
 
 export const MAX_POLYGONS = 420;
@@ -172,20 +174,26 @@ export function tubeCenterline(waypoints: V3[], bendRadius: number): V3[] {
   return filletCenterline(waypoints, bendRadius);
 }
 
-function framesAlong(points: V3[]): Frame[] {
-  let previous: V3 | null = null;
+export type TubeFrame = { origin: V3; T: V3; N: V3; B: V3 };
+
+/** Local T-N-B frame along a smoothed centerline. N is propagated so the tube does not twist. */
+export function tubeFrames(points: V3[]): TubeFrame[] {
+  let previousN: V3 | null = null;
   return points.map((origin, index) => {
     const before = points[Math.max(0, index - 1)] ?? origin;
     const after = points[Math.min(points.length - 1, index + 1)] ?? origin;
-    const axis = unit3(sub3(after, before));
-    let u: V3;
-    if (!previous) u = frameAlong(origin, axis).u;
-    else {
-      const projected = sub3(previous, mul3(axis, dot3(previous, axis)));
-      u = len3(projected) > 1e-6 ? unit3(projected) : frameAlong(origin, axis).u;
+    const T = unit3(sub3(after, before));
+    let N: V3;
+    if (!previousN) {
+      const helper: V3 = Math.abs(T[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+      N = unit3(cross3(T, helper));
+    } else {
+      const projected = sub3(previousN, mul3(T, dot3(previousN, T)));
+      N = len3(projected) > 1e-6 ? unit3(projected) : unit3(cross3(T, [1, 0, 0]));
     }
-    previous = u;
-    return { o: origin, a: axis, u, v: cross3(axis, u) };
+    previousN = N;
+    const B = cross3(T, N);
+    return { origin, T, N, B };
   });
 }
 
@@ -242,8 +250,11 @@ function tubeQuads(waypoints: V3[], radius: number, bendRadius: number): V3[][] 
   const line = filletCenterline(waypoints, Math.max(bendRadius, radius * 2));
   if (line.length < 2) return [];
   const sides = 8;
-  const rings = framesAlong(line).map((frame) =>
-    Array.from({ length: sides }, (_, index) => pointOn(frame, 0, radius, (index / sides) * Math.PI * 2)),
+  const rings = tubeFrames(line).map((frame) =>
+    Array.from({ length: sides }, (_, index) => {
+      const angle = (index / sides) * Math.PI * 2;
+      return add3(frame.origin, add3(mul3(frame.N, radius * Math.cos(angle)), mul3(frame.B, radius * Math.sin(angle))));
+    }),
   );
   const faces: V3[][] = [];
   for (let index = 0; index < rings.length - 1; index += 1) {
@@ -379,21 +390,6 @@ export function distanceToPrimitive(point: V3, primitive: GeometryPrimitive): nu
   return best - primitive.radius;
 }
 
-function distanceToPart(point: V3, part: FigurePart, t: number, explode: number): number {
-  const local = unposePoint(point, part.joint, t, explode);
-  let best = Infinity;
-  for (const primitive of part.primitives) best = Math.min(best, distanceToPrimitive(local, primitive));
-  return best;
-}
-
-function partSamples(part: FigurePart, t: number, explode: number): V3[] {
-  const cloud: V3[] = [];
-  for (const primitive of part.primitives) {
-    for (const point of restCloud(primitive)) cloud.push(posePoint(point, part.joint, t, explode));
-  }
-  return cloud.slice(0, 80);
-}
-
 function sameMotion(a: KinematicJoint, b: KinematicJoint): boolean {
   if (a.type !== b.type) return false;
   if (a.type === "fixed") return true;
@@ -410,46 +406,102 @@ export type ClearanceReport = {
   pairs: { moverId: string; gap: number; required: number; direction: V3 }[];
 };
 
+export type Box3D = { min: V3; max: V3 };
+
+export function aabbOf(points: V3[]): Box3D | null {
+  if (!points.length) return null;
+  const min: V3 = [Infinity, Infinity, Infinity];
+  const max: V3 = [-Infinity, -Infinity, -Infinity];
+  for (const point of points) {
+    for (let axis = 0; axis < 3; axis += 1) {
+      const value = point[axis] ?? 0;
+      min[axis] = Math.min(min[axis] ?? Infinity, value);
+      max[axis] = Math.max(max[axis] ?? -Infinity, value);
+    }
+  }
+  return { min, max };
+}
+
+/** Positive when the boxes are apart, zero when they touch, negative by the shallowest overlap. */
+export function aabbSurfaceDistance(a: Box3D, b: Box3D): number {
+  const gap: V3 = [0, 0, 0];
+  let separated = false;
+  for (let axis = 0; axis < 3; axis += 1) {
+    const a0 = a.min[axis] ?? 0;
+    const a1 = a.max[axis] ?? 0;
+    const b0 = b.min[axis] ?? 0;
+    const b1 = b.max[axis] ?? 0;
+    if (a1 < b0) {
+      gap[axis] = b0 - a1;
+      separated = true;
+    } else if (b1 < a0) {
+      gap[axis] = a0 - b1;
+      separated = true;
+    }
+  }
+  if (separated) return Math.hypot(gap[0], gap[1], gap[2]);
+  const overlap = [0, 1, 2].map((axis) => {
+    const a0 = a.min[axis] ?? 0;
+    const a1 = a.max[axis] ?? 0;
+    const b0 = b.min[axis] ?? 0;
+    const b1 = b.max[axis] ?? 0;
+    return Math.min(a1, b1) - Math.max(a0, b0);
+  });
+  return -Math.min(...overlap);
+}
+
+function posedVertices(part: FigurePart, t: number, explode: number): V3[] {
+  const cloud: V3[] = [];
+  for (const primitive of part.primitives) {
+    for (const face of primitiveFaces(primitive)) {
+      for (const point of face) cloud.push(posePoint(point, part.joint, t, explode));
+    }
+  }
+  return cloud;
+}
+
 export function observeClearance(spec: FigureIdeaSpec, t: number, explode = 0): ClearanceReport {
   const samples = spec.parts.map((part) => {
-    const points = partSamples(part, t, explode);
-    return { part, points, center: centroid(points.slice(0, 12)) };
+    const points = posedVertices(part, t, explode);
+    const box = aabbOf(points);
+    const center = box
+      ? ([
+          ((box.min[0] ?? 0) + (box.max[0] ?? 0)) / 2,
+          ((box.min[1] ?? 0) + (box.max[1] ?? 0)) / 2,
+          ((box.min[2] ?? 0) + (box.max[2] ?? 0)) / 2,
+        ] as V3)
+      : ([0, 0, 0] as V3);
+    return { part, box, center };
   });
-  let strictObserved = Infinity;
-  let anyObserved = Infinity;
+  let observed = Infinity;
   let valid = true;
   const pairs: ClearanceReport["pairs"] = [];
   for (let i = 0; i < samples.length; i += 1) {
     for (let j = i + 1; j < samples.length; j += 1) {
       const a = samples[i];
       const b = samples[j];
-      if (!a || !b) continue;
-      let gap = Infinity;
-      for (const point of a.points) gap = Math.min(gap, distanceToPart(point, b.part, t, explode));
-      for (const point of b.points) gap = Math.min(gap, distanceToPart(point, a.part, t, explode));
-      anyObserved = Math.min(anyObserved, gap);
+      if (!a?.box || !b?.box) continue;
+      const gap = aabbSurfaceDistance(a.box, b.box);
+      observed = Math.min(observed, gap);
       const together = sameMotion(a.part.joint, b.part.joint);
-      if (!together) {
-        strictObserved = Math.min(strictObserved, gap);
-        const required = Math.max(a.part.joint.minClearanceMm, b.part.joint.minClearanceMm, 1.5);
-        if (gap < required - 1e-3) {
-          valid = false;
-          const mover = a.part.joint.type !== "fixed" ? a : b;
-          const other = mover === a ? b : a;
-          const delta = sub3(mover.center, other.center);
-          pairs.push({
-            moverId: mover.part.id,
-            gap,
-            required,
-            direction: len3(delta) > 0.2 ? unit3(delta) : unit3(mover.part.joint.axis),
-          });
-        }
-      } else if (gap < SUNK_MM) {
+      const required = Math.max(a.part.joint.minClearanceMm, b.part.joint.minClearanceMm, 1.5);
+      const sunk = gap < SUNK_MM;
+      const tooClose = !together && gap < required - 1e-3;
+      if (sunk || tooClose) {
         valid = false;
+        const mover = a.part.joint.type !== "fixed" ? a : b;
+        const other = mover === a ? b : a;
+        const delta = sub3(mover.center, other.center);
+        pairs.push({
+          moverId: mover.part.id,
+          gap,
+          required,
+          direction: len3(delta) > 0.2 ? unit3(delta) : unit3(mover.part.joint.axis),
+        });
       }
     }
   }
-  const observed = Number.isFinite(strictObserved) ? strictObserved : Number.isFinite(anyObserved) ? anyObserved : 0;
+  if (!Number.isFinite(observed)) observed = 0;
   return { minClearanceObservedMm: observed, clearanceEnvelopeValid: valid, pairs };
 }
 
@@ -484,17 +536,17 @@ export function parseViewBox(viewBox: string): { minX: number; minY: number; wid
   return { minX, minY, width, height };
 }
 
-export function pointsInsideViewBox(viewBox: string, points: Flat[]): boolean {
+export function pointsInsideViewBox(viewBox: string, points: Flat[], slack = 0): boolean {
   const box = parseViewBox(viewBox);
-  if (!box) return false;
+  if (!box || box.width <= 1 || box.height <= 1) return false;
   return points.every(
     ([x, y]) =>
       Number.isFinite(x) &&
       Number.isFinite(y) &&
-      x >= box.minX - 0.75 &&
-      y >= box.minY - 0.75 &&
-      x <= box.minX + box.width + 0.75 &&
-      y <= box.minY + box.height + 0.75,
+      x > box.minX - slack &&
+      y > box.minY - slack &&
+      x < box.minX + box.width + slack &&
+      y < box.minY + box.height + slack,
   );
 }
 
@@ -586,12 +638,16 @@ function viewBoxFrom(points: Flat[]): string {
 export function measureAudit(input: {
   viewBox: string;
   polygons: { id: string; partId: string; points2D: Flat[]; depthZ: number }[];
+  callouts?: { anchor2D: Flat; elbow2D: Flat; label2D: Flat }[];
   projection: FigureIdeaSpec["projection"];
   clearance: number;
   clearanceValid: boolean;
   emptyDropped: boolean;
-}): FigureAudit {
-  const flat = input.polygons.flatMap((polygon) => polygon.points2D);
+}): GeometricAuditReport {
+  const flat = [
+    ...input.polygons.flatMap((polygon) => polygon.points2D),
+    ...(input.callouts ?? []).flatMap((callout) => [callout.anchor2D, callout.elbow2D, callout.label2D]),
+  ];
   const warnings: string[] = [];
   const affineBoundsValid = projectionIsAffine(input.projection) && pointsInsideViewBox(input.viewBox, flat);
   const emptyClippingValid =
@@ -697,6 +753,7 @@ export function compileFigureScene(spec: FigureIdeaSpec, t: number, options?: { 
     audit: measureAudit({
       viewBox,
       polygons,
+      callouts,
       projection: spec.projection,
       clearance: clearance.minClearanceObservedMm,
       clearanceValid: clearance.clearanceEnvelopeValid,
