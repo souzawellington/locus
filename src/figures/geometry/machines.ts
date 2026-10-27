@@ -367,6 +367,9 @@ export const MACHINES: Machine[] = specs.map((spec) => ({
   projection: P,
 }));
 
+/** Instants the scene audit must pass before a figure is shown. */
+export const SCENE_AUDIT_T = [0, 0.25, 0.5, 0.75, 1] as const;
+
 export function machineBySlug(slug: string): Machine | undefined {
   return MACHINES.find((machine) => machine.slug === slug);
 }
