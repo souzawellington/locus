@@ -10,6 +10,11 @@ export function idleExpired(lastActive: number, now: number, wait = LOCK_AFTER_M
   return now - lastActive >= wait;
 }
 
+/** True when the note carries a seal. Open text in memory does not unlock the check. */
+export function noteIsLocked(note: { seal?: unknown } | null | undefined): boolean {
+  return Boolean(note?.seal);
+}
+
 function bytesToB64(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);

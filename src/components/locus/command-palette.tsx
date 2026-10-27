@@ -36,6 +36,7 @@ export function CommandPalette({ shortcut }: { shortcut: string }) {
   const preparePattern = useVault((state) => state.preparePattern);
   const insertFigure = useVault((state) => state.insertFigure);
   const setIdeaOpen = useVault((state) => state.setIdeaOpen);
+  const setFigureOpen = useVault((state) => state.setFigureOpen);
   const ideas = useVault((state) => state.ideas) ?? [];
   const [pendingExport, setPendingExport] = useState<{ filename: string; text: string } | null>(
     null,
@@ -167,6 +168,16 @@ export function CommandPalette({ shortcut }: { shortcut: string }) {
               }}
             >
               Proponha uma ideia
+            </Command.Item>
+            <Command.Item
+              className="rounded-md px-3 py-3 text-sm"
+              value="desenhar figura da nota"
+              onSelect={() => {
+                close();
+                setFigureOpen(true);
+              }}
+            >
+              Desenhar figura
             </Command.Item>
             {FIGURES.map((figure) => (
               <Command.Item

@@ -256,6 +256,7 @@ export function Editor() {
   const updateTitle = useVault((state) => state.updateTitle);
   const commitRename = useVault((state) => state.commitRename);
   const setConfirm = useVault((state) => state.setConfirm);
+  const setFigureOpen = useVault((state) => state.setFigureOpen);
   const placeOnCanvas = useVault((state) => state.placeOnCanvas);
   const setView = useVault((state) => state.setView);
   const openWiki = useVault((state) => state.openWiki);
@@ -440,6 +441,13 @@ export function Editor() {
               </div>
             ) : null}
           </div>
+          <button
+            type="button"
+            className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-sm text-current/70"
+            onClick={() => setFigureOpen(true)}
+          >
+            Desenhar figura
+          </button>
           <button
             type="button"
             className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-sm text-current/70"
