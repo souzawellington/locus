@@ -1,15 +1,20 @@
-import { useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Dots, IsoFigure, Line, Plate, Solid } from "../../.agents/skills/anatomy/kit/react/draw";
 import { follow, useInView, useLoop, useReadout } from "../../.agents/skills/anatomy/kit/react/live";
 import { translateAlong } from "../../.agents/skills/anatomy/kit/iso-kit";
 import "../../.agents/skills/anatomy/kit/iso.css";
+import { ApproveLine } from "@/components/locus/approve";
 import type { FigureEmbed } from "@/lib/vault/markdown";
+import { downloadText } from "@/lib/vault/format";
 import { useVault } from "@/lib/vault/store";
-import { resolveMachine } from "./idea/compile";
-import type { SavedIdea } from "./idea/schema";
+import { compileFigureScene } from "./geometry/scene";
+import { resolveMachine, validateAndRepair } from "./idea/compile";
+import type { FigureIdeaSpec, SavedIdea } from "./idea/schema";
 import { sorted } from "./geometry/common";
 import type { Machine } from "./geometry/machines";
 import { exportFigure, type ExportKind } from "./export-client";
+import { printSheetSvg, readThemeTokens } from "./print-sheet";
+import { SceneView } from "./SceneView";
 
 function MachineView({
   machine,
@@ -149,6 +154,67 @@ function MachineView({
   );
 }
 
+function SceneHost({
+  spec,
+  compact,
+  showExport,
+}: {
+  spec: FigureIdeaSpec;
+  compact: boolean;
+  showExport: boolean;
+}) {
+  const verdict = useMemo(() => validateAndRepair(spec), [spec]);
+  const prepared = verdict.accepted ? verdict.spec : null;
+  const [parameter, setParameter] = useState(() => prepared?.defaultParameterT ?? 0.25);
+  const [exploded, setExploded] = useState(false);
+  const [dots, setDots] = useState(true);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [pendingSheet, setPendingSheet] = useState<string | null>(null);
+  const scene = useMemo(
+    () => (prepared ? compileFigureScene(prepared, parameter, { explode: exploded ? 1 : 0 }) : null),
+    [prepared, parameter, exploded],
+  );
+  if (!prepared || !scene) {
+    return (
+      <figure className="rounded-md border border-dashed border-line bg-paper-2 px-4 py-3 text-sm text-muted">
+        Não deu para desenhar esta figura.
+      </figure>
+    );
+  }
+  return (
+    <>
+      <SceneView
+        title={prepared.title}
+        subtitle={prepared.subtitle}
+        parameterLabel={prepared.parameterLabel}
+        t={parameter}
+        exploded={exploded}
+        dots={dots}
+        selected={selected}
+        scene={scene}
+        compact={compact}
+        onT={setParameter}
+        onToggleExplode={() => setExploded((value) => !value)}
+        onToggleDots={() => setDots((value) => !value)}
+        onSelect={setSelected}
+        onPrint={showExport ? () => setPendingSheet(printSheetSvg(prepared, readThemeTokens())) : undefined}
+      />
+      {pendingSheet ? (
+        <ApproveLine
+          sentence="Exportar a prancha desta figura?"
+          yesLabel="Aprovar"
+          noLabel="Recusar"
+          onYes={() => {
+            downloadText(`locus-${prepared.id}.svg`, pendingSheet, "image/svg+xml");
+            setPendingSheet(null);
+          }}
+          onNo={() => setPendingSheet(null)}
+        />
+      ) : null}
+    </>
+  );
+}
+
 const EXPORTS: { kind: ExportKind; label: string }[] = [
   { kind: "svg", label: "SVG" },
   { kind: "png-512", label: "PNG 512" },
@@ -161,16 +227,25 @@ export function FigureHost({
   showExport = true,
   apart = false,
   draft = null,
+  scene = null,
 }: {
   embed: FigureEmbed;
   showExport?: boolean;
   apart?: boolean;
   draft?: SavedIdea | null;
+  scene?: FigureIdeaSpec | null;
 }) {
   const ideas = useVault((state) => state.ideas);
+  const scenes = useVault((state) => state.scenes) ?? [];
+  const root = useRef<HTMLDivElement>(null);
+  const resolved = scene ?? scenes.find((item) => item.id === embed.slug) ?? null;
+  if (resolved) {
+    return (
+      <SceneHost spec={resolved} compact={embed.size === "sticker"} showExport={showExport && embed.size !== "sticker"} />
+    );
+  }
   const pool = draft ? [draft, ...(ideas ?? []).filter((item) => item.slug !== draft.slug)] : (ideas ?? []);
   const machine = resolveMachine(embed.slug, pool);
-  const root = useRef<HTMLDivElement>(null);
   if (!machine) {
     return (
       <figure className="rounded-md border border-dashed border-line bg-paper-2 px-4 py-3 text-sm text-muted">

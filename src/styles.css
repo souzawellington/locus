@@ -150,6 +150,127 @@
   width: 100%;
 }
 
+.locus-scene {
+  --surface: var(--paper-2);
+  --foreground: var(--ink);
+  --muted-foreground: var(--muted);
+  --accent: var(--copper);
+  --border: var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.75rem;
+  color: var(--foreground);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  outline: none;
+  font-family: var(--font-mono, "IBM Plex Mono", monospace);
+}
+
+.locus-scene[data-size="sticker"] {
+  max-width: 240px;
+  padding: 0.4rem;
+}
+
+.locus-scene svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--paper);
+}
+
+.locus-scene [data-tone="base"] {
+  fill: var(--paper);
+}
+
+.locus-scene [data-tone="elevated"] {
+  fill: var(--paper-2);
+}
+
+.locus-scene [data-tone="accent"] {
+  fill: var(--copper-soft);
+}
+
+.locus-scene [data-tone="cutaway"] {
+  fill: var(--line);
+}
+
+.locus-scene polygon {
+  stroke: var(--ink);
+  stroke-linejoin: round;
+  cursor: pointer;
+}
+
+.locus-scene [data-stroke="crease"],
+.locus-scene [data-stroke="section"] {
+  stroke: var(--muted);
+}
+
+.locus-scene [data-stroke="construction"] {
+  stroke: var(--line);
+}
+
+.locus-scene [data-hot="true"] {
+  stroke: var(--accent);
+}
+
+.locus-scene text,
+.locus-scene-readout,
+.locus-scene-callout,
+.locus-scene-controls,
+.locus-scene-controls button {
+  font-family: var(--font-mono, "IBM Plex Mono", monospace);
+}
+
+.locus-scene text {
+  font-size: 11px;
+  fill: var(--muted);
+}
+
+.locus-scene-callout polyline {
+  stroke: var(--muted);
+  stroke-width: 0.75;
+  fill: none;
+}
+
+.locus-scene-readout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.locus-scene-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.locus-scene-controls label {
+  display: flex;
+  min-width: 10rem;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.locus-scene-controls input[type="range"] {
+  width: 100%;
+  accent-color: var(--copper);
+}
+
+.locus-scene-controls button {
+  height: 2.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--paper);
+  color: var(--foreground);
+  padding: 0 0.75rem;
+  font-size: 0.8rem;
+}
+
 .locus-sticker-wrap {
   display: inline-block;
   max-width: 240px;

@@ -1,6 +1,122 @@
 import { HEIGHT, P, WIDTH, baseGroup, cyl, screws, slab, type Group, type Item } from "../geometry/common.ts";
-import { machineBySlug, type Machine } from "../geometry/machines.ts";
-import type { IdeaPart, SavedIdea } from "./schema.ts";
+import { SCENE_AUDIT_T, machineBySlug, type Machine } from "../geometry/machines.ts";
+import {
+  aabbOf,
+  aabbSurfaceDistance,
+  add3,
+  compileFigureScene,
+  observeClearance,
+  tubeFrames,
+  type FigureScene,
+  type GeometricAuditReport,
+  type V3,
+} from "../geometry/scene.ts";
+import { sanitizeFigureCopyWithHumanizer } from "./prompt.ts";
+import {
+  coerceFigureSpec,
+  FigureIdeaSpecSchema,
+  type FigureIdeaSpec,
+  type FigurePart,
+  type GeometryPrimitive,
+  type IdeaPart,
+  type SavedIdea,
+  type Vector3,
+} from "./schema.ts";
+
+export type { FigureScene, GeometricAuditReport };
+export type FigureAudit = GeometricAuditReport;
+
+export type FigureSample = { t: number; audit: GeometricAuditReport };
+
+export type FigureVerdict = {
+  accepted: boolean;
+  spec: FigureIdeaSpec | null;
+  samples: FigureSample[];
+};
+
+const move = (point: Vector3, delta: V3): Vector3 => add3(point, delta);
+
+function shiftPrimitive(primitive: GeometryPrimitive, delta: V3): GeometryPrimitive {
+  if (primitive.kind === "lathe") return { ...primitive, axisOrigin: move(primitive.axisOrigin, delta) };
+  if (primitive.kind === "tube") return { ...primitive, waypoints: primitive.waypoints.map((point) => move(point, delta)) };
+  return { ...primitive, center: move(primitive.center, delta) };
+}
+
+function shiftPart(part: FigurePart, delta: V3): FigurePart {
+  return {
+    ...part,
+    calloutAnchor: move(part.calloutAnchor, delta),
+    joint: { ...part.joint, origin: move(part.joint.origin, delta) },
+    primitives: part.primitives.map((primitive) => shiftPrimitive(primitive, delta)),
+  };
+}
+
+function normalizeGeometry(spec: FigureIdeaSpec): FigureIdeaSpec {
+  return {
+    ...spec,
+    parts: spec.parts.map((part) => ({
+      ...part,
+      strokeTier: part.surfaceTone === "cutaway" && part.strokeTier === "silhouette" ? "section" : part.strokeTier,
+      joint: { ...part.joint, minClearanceMm: Math.max(1.5, part.joint.minClearanceMm) },
+      primitives: part.primitives.map((primitive) =>
+        primitive.kind === "tube"
+          ? { ...primitive, bendRadius: Math.max(primitive.bendRadius, primitive.radius * 2, 4) }
+          : primitive,
+      ),
+    })),
+  };
+}
+
+function repairClearance(spec: FigureIdeaSpec): FigureIdeaSpec {
+  let next = spec;
+  for (const t of SCENE_AUDIT_T) {
+    for (const explode of [0, 1]) {
+      const report = observeClearance(next, t, explode);
+      for (const pair of report.pairs) {
+        const push = Math.max(0, pair.required - pair.gap + 0.4);
+        const delta: V3 = [pair.direction[0] * push, pair.direction[1] * push, pair.direction[2] * push];
+        next = {
+          ...next,
+          parts: next.parts.map((part) => (part.id === pair.moverId ? shiftPart(part, delta) : part)),
+        };
+      }
+    }
+  }
+  return next;
+}
+
+function auditAt(spec: FigureIdeaSpec, t: number): GeometricAuditReport {
+  const rest = compileFigureScene(spec, t, { explode: 0 }).audit;
+  const apart = compileFigureScene(spec, t, { explode: 1 }).audit;
+  return {
+    passed: rest.passed && apart.passed,
+    affineBoundsValid: rest.affineBoundsValid && apart.affineBoundsValid,
+    emptyClippingValid: rest.emptyClippingValid && apart.emptyClippingValid,
+    clearanceEnvelopeValid: rest.clearanceEnvelopeValid && apart.clearanceEnvelopeValid,
+    orderConvergenceValid: rest.orderConvergenceValid && apart.orderConvergenceValid,
+    minClearanceObservedMm: Math.min(rest.minClearanceObservedMm, apart.minClearanceObservedMm),
+    warnings: [...rest.warnings, ...apart.warnings.filter((warning) => !rest.warnings.includes(warning))],
+  };
+}
+
+export function auditFigureSpec(spec: FigureIdeaSpec): FigureSample[] {
+  return SCENE_AUDIT_T.map((t) => ({ t, audit: auditAt(spec, t) }));
+}
+
+/** Reject or separate a spec. A broken pose is never the one we keep. */
+export function validateAndRepair(input: unknown): FigureVerdict {
+  const parsed = FigureIdeaSpecSchema.safeParse(coerceFigureSpec(input));
+  if (!parsed.success) return { accepted: false, spec: null, samples: [] };
+  let spec = normalizeGeometry(sanitizeFigureCopyWithHumanizer(parsed.data));
+  let samples = auditFigureSpec(spec);
+  if (samples.some((sample) => !sample.audit.passed)) {
+    spec = normalizeGeometry(sanitizeFigureCopyWithHumanizer(repairClearance(spec)));
+    samples = auditFigureSpec(spec);
+  }
+  return { accepted: samples.every((sample) => sample.audit.passed), spec, samples };
+}
+
+export { aabbOf, aabbSurfaceDistance, compileFigureScene, tubeFrames };
 
 function partItems(part: IdeaPart): Item[] {
   if (part.kind === "screw") return screws(part.id, [[part.x, part.y, part.z]]);

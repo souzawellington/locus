@@ -14,8 +14,8 @@ import {
 } from "./markdown";
 import { findNote, findNoteLoose, presentNotes } from "./retrieve";
 import { seedCells, seedNotes } from "./seed";
-import type { SavedIdea } from "@/figures/idea/schema";
-import { ideaSlug } from "@/figures/idea/schema";
+import type { FigureIdeaSpec, SavedIdea } from "@/figures/idea/schema";
+import { ideaSlug, parseFigureSpec } from "@/figures/idea/schema";
 import {
   createPinRecord,
   encryptWithKey,
@@ -59,7 +59,9 @@ type VaultState = {
   notes: Note[];
   stickers: BoardSticker[];
   ideas: SavedIdea[];
+  scenes: FigureIdeaSpec[];
   ideaOpen: boolean;
+  figureOpen: boolean;
   openNotes: Record<string, OpenNote>;
   sourceChosen: boolean;
   placeSuggest: boolean;
@@ -111,7 +113,9 @@ type VaultState = {
   moveSticker: (id: string, x: number, y: number) => void;
   removeSticker: (id: string) => void;
   setIdeaOpen: (open: boolean) => void;
+  setFigureOpen: (open: boolean) => void;
   saveIdea: (idea: Omit<SavedIdea, "slug"> & { slug?: string }) => string;
+  saveScene: (spec: FigureIdeaSpec) => string;
   renameIdea: (slug: string, title: string, nextSlug: string) => void;
   deleteIdea: (slug: string) => void;
   updateTitle: (id: string, title: string) => void;
@@ -229,7 +233,9 @@ export const useVault = create<VaultState>()(
       notes: initialNotes,
       stickers: [],
       ideas: [],
+      scenes: [],
       ideaOpen: false,
+      figureOpen: false,
       openNotes: {},
       sourceChosen: false,
       placeSuggest: true,
@@ -464,6 +470,7 @@ export const useVault = create<VaultState>()(
       removeSticker: (id) =>
         set({ stickers: (get().stickers ?? []).filter((sticker) => sticker.id !== id) }),
       setIdeaOpen: (ideaOpen) => set({ ideaOpen }),
+      setFigureOpen: (figureOpen) => set({ figureOpen }),
       saveIdea: (idea) => {
         const ideas = get().ideas ?? [];
         const slug = ideaSlug(
@@ -474,6 +481,12 @@ export const useVault = create<VaultState>()(
         set({ ideas: [...ideas, saved] });
         get().insertFigure(slug);
         return slug;
+      },
+      saveScene: (spec) => {
+        const saved = parseFigureSpec(spec);
+        const scenes = get().scenes ?? [];
+        set({ scenes: [...scenes.filter((item) => item.id !== saved.id), saved] });
+        return saved.id;
       },
       renameIdea: (slug, title, nextSlug) => {
         const clean = ideaSlug(
@@ -959,6 +972,8 @@ export const useVault = create<VaultState>()(
         set({
           notes,
           stickers: [],
+          scenes: [],
+          figureOpen: false,
           openNotes: {},
           cells: seedCells(),
           messages: [],
@@ -993,6 +1008,15 @@ export const useVault = create<VaultState>()(
           ...current,
           ...saved,
           ideas: saved.ideas ?? [],
+          scenes: Array.isArray(saved.scenes)
+            ? saved.scenes.flatMap((item) => {
+                try {
+                  return [parseFigureSpec(item)];
+                } catch {
+                  return [];
+                }
+              })
+            : [],
           stickers: saved.stickers ?? [],
           openNotes: {},
           sourceChosen,
@@ -1006,6 +1030,7 @@ export const useVault = create<VaultState>()(
         notes: state.notes,
         stickers: state.stickers,
         ideas: state.ideas,
+        scenes: state.scenes,
         sourceChosen: state.sourceChosen,
         placeSuggest: state.placeSuggest,
         placeAlerts: state.placeAlerts,

@@ -2,10 +2,14 @@ export function ApproveLine({
   sentence,
   onYes,
   onNo,
+  yesLabel = "Aprovar",
+  noLabel = "Recusar",
 }: {
   sentence: string;
   onYes: () => void;
   onNo: () => void;
+  yesLabel?: string;
+  noLabel?: string;
 }) {
   return (
     <div
@@ -21,14 +25,14 @@ export function ApproveLine({
             className="h-11 rounded-md bg-copper px-4 text-sm text-paper-2"
             onClick={onYes}
           >
-            Aprovar
+            {yesLabel}
           </button>
           <button
             type="button"
             className="h-11 rounded-md border border-line px-4 text-sm text-ink"
             onClick={onNo}
           >
-            Recusar
+            {noLabel}
           </button>
         </div>
       </div>

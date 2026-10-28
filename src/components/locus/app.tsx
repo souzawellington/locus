@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { AtlasView } from "./atlas-view";
 import { CanvasBoard } from "./canvas-board";
 import { CommandPalette } from "./command-palette";
+import { DrawFigure } from "./draw-figure";
 import { ProposeIdea } from "./propose-idea";
 import { StickerDrawer } from "./sticker-drawer";
 import { Editor } from "./editor";
@@ -54,6 +55,8 @@ export function LocusApp() {
   const unlockAllNow = useVault((state) => state.unlockAllNow);
   const ideaOpen = useVault((state) => state.ideaOpen);
   const setIdeaOpen = useVault((state) => state.setIdeaOpen);
+  const figureOpen = useVault((state) => state.figureOpen);
+  const setFigureOpen = useVault((state) => state.setFigureOpen);
 
   useEffect(() => {
     let live = true;
@@ -271,6 +274,7 @@ export function LocusApp() {
       <CommandPalette shortcut={shortcut} />
       <StickerDrawer open={stickersOpen} onClose={() => setStickersOpen(false)} />
       <ProposeIdea open={ideaOpen} onClose={() => setIdeaOpen(false)} />
+      <DrawFigure open={figureOpen} onClose={() => setFigureOpen(false)} />
 
       {confirm ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
