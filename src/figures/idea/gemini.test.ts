@@ -3,7 +3,12 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { GEMINI_MODEL } from "../../lib/vault/atlas.ts";
 import { benchSpec } from "./examples.ts";
-import { buildFigureGeminiPayload, compileWithGemini, createFigureGate, parseFigureAsk } from "./gemini.ts";
+import {
+  buildFigureGeminiPayload,
+  compileWithGemini,
+  createFigureGate,
+  parseFigureAsk,
+} from "./gemini.ts";
 
 const input = {
   userRequest: "uma bancada de prova",
@@ -52,6 +57,7 @@ test("a missing, refused or slow key falls back without echoing the secret", asy
     },
   });
   assert.equal(missing.kind, "fallback");
+  assert.equal(missing.reason, "missing-key");
   assert.equal(missing.spec.parts.length >= 2, true);
   const gate = createFigureGate();
   const now = 5_000_000;
@@ -61,9 +67,16 @@ test("a missing, refused or slow key falls back without echoing the secret", asy
     return new Response(null, { status: 401 });
   };
   const first = await compileWithGemini(input, { apiKey: "secret-key-xyz", fetchImpl, gate, now });
-  const second = await compileWithGemini(input, { apiKey: "secret-key-xyz", fetchImpl, gate, now: now + 100 });
+  const second = await compileWithGemini(input, {
+    apiKey: "secret-key-xyz",
+    fetchImpl,
+    gate,
+    now: now + 100,
+  });
   assert.equal(first.kind, "fallback");
+  assert.equal(first.reason, "http-401");
   assert.equal(second.kind, "fallback");
+  assert.equal(second.reason, "rate-limit");
   assert.equal(calls, 1);
   assert.equal(JSON.stringify(first).includes("secret-key-xyz"), false);
   assert.equal(JSON.stringify(second).includes("secret-key-xyz"), false);
@@ -74,6 +87,7 @@ test("a missing, refused or slow key falls back without echoing the secret", asy
     fetchImpl: abortingFetch(200),
   });
   assert.equal(timed.kind, "fallback");
+  assert.equal(timed.reason, "exception timeout");
   assert.equal(JSON.stringify(timed).includes("secret-key-xyz"), false);
 });
 
@@ -82,7 +96,8 @@ test("a valid model spec is kept and a broken one is replaced", async () => {
   const accepted = await compileWithGemini(input, {
     apiKey: "secret-key-xyz",
     gate: createFigureGate(),
-    fetchImpl: async () => new Response(JSON.stringify({ choices: [{ message: { content: good } }] }), { status: 200 }),
+    fetchImpl: async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: good } }] }), { status: 200 }),
   });
   assert.equal(accepted.kind, "model");
   assert.equal(accepted.spec.id, "fig-bancada");
@@ -90,15 +105,35 @@ test("a valid model spec is kept and a broken one is replaced", async () => {
     apiKey: "secret-key-xyz",
     gate: createFigureGate(),
     fetchImpl: async () =>
-      new Response(JSON.stringify({ choices: [{ message: { content: "{\"title\":\"nao\"}" } }] }), { status: 200 }),
+      new Response(JSON.stringify({ choices: [{ message: { content: '{"title":"nao"}' } }] }), {
+        status: 200,
+      }),
   });
   assert.equal(broken.kind, "fallback");
+  assert.equal(broken.reason, "audit-failed");
   assert.ok(broken.spec.parts.length >= 2);
+  const unreadable = await compileWithGemini(input, {
+    apiKey: "secret-key-xyz",
+    gate: createFigureGate(),
+    fetchImpl: async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: "not-json" } }] }), {
+        status: 200,
+      }),
+  });
+  assert.equal(unreadable.kind, "fallback");
+  assert.equal(unreadable.reason, "bad-json");
+  assert.equal(JSON.stringify(unreadable).includes("secret-key-xyz"), false);
+  assert.equal(JSON.stringify(unreadable).includes("A haste mede"), false);
 });
 
 test("the server entry reads GEMINI_API_KEY and never a VITE key", () => {
   const source = readFileSync(new URL("../../lib/vault/figure-ask.ts", import.meta.url), "utf8");
   assert.match(source, /GEMINI_API_KEY/);
   assert.equal(source.includes("VITE_"), false);
-  assert.equal(source.includes("console."), false);
+  assert.match(source, /figure ready/);
+  assert.match(source, /figure ask/);
+  assert.match(source, /figure fallback/);
+  assert.match(source, /figure answer/);
+  assert.equal(source.includes("console.info(data"), false);
+  assert.equal(source.includes("console.info(outcome.spec"), false);
 });

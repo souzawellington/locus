@@ -317,7 +317,7 @@ export function normalizeGeminiKey(raw: string | undefined): string {
   return key;
 }
 
-async function geminiFailure(response: Response, apiKey: string): Promise<string> {
+export async function geminiHttpReason(response: Response, apiKey: string): Promise<string> {
   let body = "";
   try {
     body = await response.text();
@@ -368,12 +368,12 @@ export async function answerWithGemini(
   try {
     const signal = AbortSignal.timeout(deps.timeoutMs ?? GEMINI_TIMEOUT_MS);
     let response = await send(payload, signal);
-    const failure = response.ok ? "" : await geminiFailure(response, apiKey);
+    const failure = response.ok ? "" : await geminiHttpReason(response, apiKey);
     if (response.status === 400 && failure && !/valid api key/i.test(failure)) {
       const first = failure;
       response = await send({ ...payload, response_format: { type: "json_object" } }, signal);
       if (!response.ok) {
-        const second = await geminiFailure(response, apiKey);
+        const second = await geminiHttpReason(response, apiKey);
         return { kind: "fallback", reason: second === first ? first : `${first} | ${second}` };
       }
     } else if (!response.ok) {
