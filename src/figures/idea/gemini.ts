@@ -1,4 +1,12 @@
-import { GEMINI_MODEL, GEMINI_TIMEOUT_MS, GEMINI_URL, parseModelJson } from "../../lib/vault/atlas.ts";
+import {
+  clipAtlasLog,
+  GEMINI_MODEL,
+  GEMINI_TIMEOUT_MS,
+  GEMINI_URL,
+  geminiHttpReason,
+  normalizeGeminiKey,
+  parseModelJson,
+} from "../../lib/vault/atlas.ts";
 import { fallbackFor } from "./examples.ts";
 import { FigureModelError, repairFigureFromModel } from "./provider.ts";
 import { buildFigureCompilationPrompt, type FigureRac } from "./prompt.ts";
@@ -12,6 +20,7 @@ export type FigureAskOutcome = {
   kind: "model" | "fallback";
   specId: string;
   spec: ReturnType<typeof fallbackFor>;
+  reason?: string;
 };
 export type FigureGate = { allow(at?: number): boolean };
 
@@ -44,7 +53,10 @@ const RESPONSE_FORMAT = {
         id: { type: "string" },
         title: { type: "string" },
         subtitle: { type: "string" },
-        domain: { type: "string", enum: ["aerospace", "metrology", "wave-physics", "computing", "mechanism"] },
+        domain: {
+          type: "string",
+          enum: ["aerospace", "metrology", "wave-physics", "computing", "mechanism"],
+        },
         projection: {
           type: "object",
           additionalProperties: false,
@@ -60,7 +72,16 @@ const RESPONSE_FORMAT = {
         parameterLabel: { type: "string" },
         parts: { type: "array", items: { type: "object", additionalProperties: true } },
       },
-      required: ["id", "title", "subtitle", "domain", "projection", "defaultParameterT", "parameterLabel", "parts"],
+      required: [
+        "id",
+        "title",
+        "subtitle",
+        "domain",
+        "projection",
+        "defaultParameterT",
+        "parameterLabel",
+        "parts",
+      ],
     },
   },
 } as const;
@@ -103,13 +124,15 @@ export function buildFigureGeminiPayload(input: FigureAskInput) {
 }
 
 function messageText(body: unknown): string {
-  const content = (body as { choices?: { message?: { content?: unknown } }[] })?.choices?.[0]?.message?.content;
+  const content = (body as { choices?: { message?: { content?: unknown } }[] })?.choices?.[0]
+    ?.message?.content;
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   return content
     .map((part) => {
       if (typeof part === "string") return part;
-      if (part && typeof part === "object" && "text" in part) return String((part as { text?: unknown }).text ?? "");
+      if (part && typeof part === "object" && "text" in part)
+        return String((part as { text?: unknown }).text ?? "");
       return "";
     })
     .join("");
@@ -150,24 +173,6 @@ function postJson(
   });
 }
 
-async function discard(response: Response): Promise<void> {
-  const body = response.body;
-  if (!body) return;
-  await new Promise<void>((resolve) => {
-    const timer = setTimeout(resolve, 30);
-    body.cancel().then(
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-    );
-  });
-}
-
 export async function compileWithGemini(
   input: FigureAskInput,
   deps: {
@@ -179,21 +184,36 @@ export async function compileWithGemini(
   },
 ): Promise<FigureAskOutcome> {
   const fallback = fallbackFor(input.userRequest);
-  const local = { kind: "fallback" as const, specId: fallback.id, spec: fallback };
-  const apiKey = deps.apiKey?.trim();
-  if (!apiKey) return local;
-  if (deps.gate && !deps.gate.allow(deps.now)) return local;
+  const local = (reason: string): FigureAskOutcome => ({
+    kind: "fallback",
+    specId: fallback.id,
+    spec: fallback,
+    reason,
+  });
+  const apiKey = normalizeGeminiKey(deps.apiKey);
+  if (!apiKey) return local("missing-key");
+  if (deps.gate && !deps.gate.allow(deps.now)) return local("rate-limit");
   const fetchImpl = deps.fetchImpl ?? fetch;
   const timeoutMs = deps.timeoutMs ?? GEMINI_TIMEOUT_MS;
   const deadline = Date.now() + timeoutMs;
+  let reason = "audit-failed";
+  const safeException = (error: unknown) => {
+    const message = error instanceof Error ? error.message : "";
+    const label = message === "timeout" || message === "rede" ? message : "Error";
+    return `exception ${clipAtlasLog(label, apiKey)}`;
+  };
   try {
     const repaired = await repairFigureFromModel({
       userRequest: input.userRequest,
       rac: input,
       deadline,
       callModel: async (prompt) => {
+        reason = "audit-failed";
         const left = deadline - Date.now();
-        if (left < 40) throw new FigureModelError("timeout");
+        if (left < 40) {
+          reason = "exception timeout";
+          throw new FigureModelError("timeout");
+        }
         const body = {
           ...buildFigureGeminiPayload({ ...input, userRequest: input.userRequest }),
           messages: [
@@ -201,22 +221,47 @@ export async function compileWithGemini(
             { role: "user", content: prompt.user },
           ],
         };
-        let response = await postJson(fetchImpl, body, apiKey, left);
+        let response: Response;
+        try {
+          response = await postJson(fetchImpl, body, apiKey, left);
+        } catch (error) {
+          reason = safeException(error);
+          throw error;
+        }
         if (response.status === 400) {
-          await discard(response);
+          await geminiHttpReason(response, apiKey);
           const retryLeft = deadline - Date.now();
-          if (retryLeft < 40) throw new FigureModelError("timeout");
-          response = await postJson(fetchImpl, { ...body, response_format: { type: "json_object" } }, apiKey, retryLeft);
+          if (retryLeft < 40) {
+            reason = "exception timeout";
+            throw new FigureModelError("timeout");
+          }
+          try {
+            response = await postJson(
+              fetchImpl,
+              { ...body, response_format: { type: "json_object" } },
+              apiKey,
+              retryLeft,
+            );
+          } catch (error) {
+            reason = safeException(error);
+            throw error;
+          }
         }
         if (!response.ok) {
-          await discard(response);
+          reason = await geminiHttpReason(response, apiKey);
           throw new FigureModelError("status");
         }
-        return parseModelJson(messageText(await response.json()));
+        try {
+          return parseModelJson(messageText(await response.json()));
+        } catch {
+          reason = "bad-json";
+          throw new Error("json");
+        }
       },
     });
-    return repaired.fromModel ? { kind: "model", specId: repaired.spec.id, spec: repaired.spec } : { kind: "fallback", specId: repaired.spec.id, spec: repaired.spec };
-  } catch {
-    return local;
+    if (repaired.fromModel) return { kind: "model", specId: repaired.spec.id, spec: repaired.spec };
+    return local(reason);
+  } catch (error) {
+    return local(safeException(error));
   }
 }
